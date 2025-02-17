@@ -10,9 +10,10 @@
     "url": "https://github.com/vikashloomba/copilot-mcp",
     "type": "git"
   },
-  "displayName": "copilot-mcp",
-  "description": "VSCode extension that acts as a Model Context Protocol (MCP) client, enabling integration between MCP tools and GitHub Copilot Chat",
+  "displayName": "Copilot MCP",
+  "description": "VSCode extension that acts as a Model Context Protocol (MCP) client, enabling integration between MCP servers and GitHub Copilot Chat",
   "version": "0.0.1",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.97.0"
   },
@@ -32,7 +33,7 @@
         "id": "copilot-mcp.mcp",
         "fullName": "MCP Agent",
         "name": "mcp",
-        "description": "Manage Model Context Protocol (MCP) tool servers and expose their tools to Copilot Chat",
+        "description": "Agent with access to Model Context Protocol (MCP) servers",
         "isSticky": true
       }
     ],
