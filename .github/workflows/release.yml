@@ -59,7 +59,9 @@ jobs:
         git push origin "v${{ inputs.version }}"
 
     - name: Build VSIX
-      run: npm run package
+      run: npm run package-extension
+      env:
+        VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
         
     - name: Create Release
       id: create_release
