@@ -2,6 +2,8 @@
 
 <div align="center">
 
+<img src="logo.png" alt="Copilot MCP Logo" width="200" />
+
 ![Version](https://img.shields.io/badge/version-0.0.4-blue.svg?cacheSeconds=2592000)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![VSCode Extension](https://img.shields.io/badge/VSCode-Extension-blue.svg?logo=visual-studio-code)](https://code.visualstudio.com/api/references/extension-guidelines)
