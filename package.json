@@ -1,0 +1,128 @@
+{
+  "name": "copilot-mcp",
+  "displayName": "copilot-mcp",
+  "description": "Manage Model Context Protocol (MCP) tool servers and expose their tools to Copilot participants",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.97.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "extensionDependencies": [
+    "github.copilot-chat"
+  ],
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "copilot-mcp.mcp",
+        "fullName": "MCP Agent",
+        "name": "mcp",
+        "description": "Manage Model Context Protocol (MCP) tool servers and expose their tools to Copilot Chat",
+        "isSticky": true
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mcpServers",
+          "title": "MCP Servers",
+          "icon": "resources/light/server.svg"
+        }
+      ]
+    },
+    "views": {
+      "mcpServers": [
+        {
+          "type": "webview",
+          "id": "mcpServerManager",
+          "name": "Server Manager",
+          "visibility": "visible"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "copilot-mcp.openServerManager",
+        "title": "Open MCP Server Manager"
+      }
+    ],
+    "configuration": {
+      "title": "MCP Manager",
+      "properties": {
+        "mcpManager.servers": {
+          "type": "array",
+          "default": [],
+          "description": "List of configured MCP servers",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "command",
+              "enabled"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the server"
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name for the server"
+              },
+              "command": {
+                "type": "string",
+                "description": "Command to start the server"
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether the server is enabled"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.17.19",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
+    "@types/vscode": "^1.97.0",
+    "@typescript-eslint/eslint-plugin": "^8.22.0",
+    "@typescript-eslint/parser": "^8.22.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
+    "css-loader": "^7.1.2",
+    "eslint": "^9.19.0",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.7.3",
+    "webpack": "^5.97.1",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.5.0",
+    "@vscode/chat-extension-utils": "^0.0.0-alpha.5",
+    "@vscode/prompt-tsx": "^0.3.0-alpha.19",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
