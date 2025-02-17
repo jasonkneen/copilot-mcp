@@ -25,6 +25,9 @@ jobs:
       
     - name: Build extension
       run: npm run package
+    
+    - name: VSCE verify Token
+      run: vsce verify-pat --pat ${{ secrets.VSCE_TOKEN }}
       
     - name: Create VSIX package
       run: vsce package
