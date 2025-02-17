@@ -4,8 +4,16 @@ on:
   push:
     paths:
       - 'package.json'
+      - 'src/*'
+      - '.github/*'
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update to (e.g. 1.0.0)'
+        required: true
+        type: string
 
 jobs:
   update-version:
@@ -24,6 +32,10 @@ jobs:
       with:
         node-version: '20'
     
+    - name: Update version in package.json if manually triggered
+      if: github.event_name == 'workflow_dispatch'
+      run: npm version ${{ inputs.version }} --no-git-tag-version --allow-same-version
+    
     - name: Get package version
       id: get_version
       run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
@@ -39,8 +51,8 @@ jobs:
     
     - name: Commit changes
       run: |
-        git add README.md
-        git diff --staged --quiet || git commit -m "docs: update version badge to ${{ steps.get_version.outputs.version }}"
+        git add README.md package.json package-lock.json
+        git diff --staged --quiet || git commit -m "chore: update version to ${{ steps.get_version.outputs.version }}"
         git push
 
     - name: Delete existing tag if present
