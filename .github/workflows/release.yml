@@ -30,9 +30,6 @@ jobs:
     
     - name: VSCE verify Token
       run: vsce verify-pat --pat ${{ secrets.VSCE_TOKEN }}
-
-    - name: VSCE publish
-      run: vsce publish
       
     - name: Create VSIX package
       run: vsce package
