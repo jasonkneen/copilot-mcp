@@ -1,23 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-
-interface ServerConfig {
-    id: string;
-    name: string;
-    command: string;
-    enabled: boolean;
-}
-
-interface Tool {
-    name: string;
-    description: string;
-    inputSchema: any;
-}
-
-interface ServerWithTools extends ServerConfig {
-    tools: Tool[];
-}
-
+import '@/styles/globals.css';
+import { ServerConfig, ServerWithTools } from './types';
+import { ServerCard } from './components/ServerCard';
+import { Button } from '@/components/ui/button';
 interface BaseModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -172,7 +158,7 @@ export function App() {
             server: {
                 name,
                 command,
-                enabled: false
+                enabled: true
             }
         });
     };
@@ -189,97 +175,35 @@ export function App() {
         setEditingServer(null);
     };
 
-    const handleRemoveServer = (id: string) => {
-        window.vscodeApi.postMessage({
-            type: 'removeServer',
-            id
-        });
-    };
-
-    const handleToggleServer = (id: string, enabled: boolean) => {
-        window.vscodeApi.postMessage({
-            type: 'toggleServer',
-            id,
-            enabled
-        });
-    };
-
     return (
-        <div className="mcp-server-manager">
-            <header>
-                <h2>MCP Server Manager</h2>
+        <div className="flex flex-col min-h-screen p-4 bg-[var(--vscode-panel-background)]">
+            <header className="mb-6">
+                <h2 className="text-xl font-semibold text-[var(--vscode-editor-foreground)]">MCP Server Manager</h2>
             </header>
-            <div className="server-list">
-                {servers.length === 0 ? (
-                    <div className="empty-state">
-                        No servers configured yet. Click "Add Server" to get started.
-                    </div>
-                ) : (
-                    servers.map(server => (
-                        <div key={server.id} className="server-item">
-                            <div 
-                                className="server-info"
-                                onClick={() => setExpandedServer(
-                                    expandedServer === server.id ? null : server.id
-                                )}
-                            >
-                                <div className="server-header">
-                                    <span className="server-name">{server.name}</span>
-                                    <span className="server-command">{server.command}</span>
-                                </div>
-                                {server.enabled && server.tools.length > 0 && (
-                                    <span className="tools-count">
-                                        {server.tools.length} tool{server.tools.length !== 1 ? 's' : ''} available
-                                    </span>
-                                )}
-                            </div>
-                            <div className="server-controls">
-                                <input
-                                    type="checkbox"
-                                    checked={server.enabled}
-                                    onChange={() => handleToggleServer(server.id, !server.enabled)}
-                                />
-                                <button
-                                    className="edit-button"
-                                    onClick={() => setEditingServer(server)}
-                                >
-                                    Edit
-                                </button>
-                                <button
-                                    className="remove-button"
-                                    onClick={() => handleRemoveServer(server.id)}
-                                >
-                                    Remove
-                                </button>
-                            </div>
-                            {expandedServer === server.id && server.tools.length > 0 && (
-                                <div className="server-tools">
-                                    <h4>Available Tools:</h4>
-                                    <div className="tools-list">
-                                        {server.tools.map(tool => (
-                                            <div key={tool.name} className="tool-item">
-                                                <div className="tool-header">
-                                                    <span className="tool-name">{tool.name}</span>
-                                                </div>
-                                                <div className="tool-description">
-                                                    {tool.description}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+            <div className="flex-1 w-full max-w-7xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {servers.length === 0 ? (
+                        <div className="col-span-full p-6 text-center rounded-md border border-[var(--vscode-widget-border)] bg-[var(--vscode-editor-background)] text-[var(--vscode-descriptionForeground)]">
+                            No servers configured yet. Click "Add Server" to get started.
                         </div>
-                    ))
-                )}
+                    ) : (
+                        servers.map(server => (
+                            <ServerCard
+                                className='bg-[var(--vscode-editor-background)] border border-[var(--vscode-widget-border)] rounded'
+                                key={server.id}
+                                server={server}
+                            />
+                        ))
+                    )}
+                </div>
             </div>
-            <div className="actions">
-                <button
-                    className="add-button"
+            <div className="mt-6 flex justify-end">
+                <Button
+                    className="bg-[var(--vscode-button-background)] hover:bg-[var(--vscode-button-hoverBackground)] text-[var(--vscode-button-foreground)]"
                     onClick={() => setIsAddModalOpen(true)}
                 >
                     Add Server
-                </button>
+                </Button>
             </div>
             <ServerModal
                 mode="add"
@@ -298,4 +222,5 @@ export function App() {
             )}
         </div>
     );
-} 
+}
+

@@ -12,7 +12,11 @@
 		"jsx": "react",
 		"esModuleInterop": true,
 		"moduleResolution": "node",
-		"resolveJsonModule": true
+		"resolveJsonModule": true,
+		"baseUrl": "./src",
+		"paths": {
+			"@/*": ["./*"]
+		}
 	},
 	"exclude": [
 		"node_modules",
