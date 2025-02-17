@@ -3,7 +3,7 @@
 <div align="center">
 
 ![Version](https://img.shields.io/badge/version-0.0.1-blue.svg?cacheSeconds=2592000)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![VSCode Extension](https://img.shields.io/badge/VSCode-Extension-blue.svg?logo=visual-studio-code)](https://code.visualstudio.com/api/references/extension-guidelines)
 [![MCP Client](https://img.shields.io/badge/MCP-Client-green.svg)](https://modelcontextprotocol.io/clients)
 
@@ -99,7 +99,7 @@ Feel free to check the [issues page](https://github.com/yourusername/copilot-mcp
 
 Copyright © 2024 [Vikash Loomba](https://automatalabs.io).
 
-This project is [MIT](LICENSE) licensed.
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
 
 ---
 
