@@ -1,71 +1,106 @@
-# copilot-mcp README
+# Copilot MCP Client for VSCode
 
-This is the README for your extension "copilot-mcp". After writing up a brief description, we recommend including the following sections.
+<div align="center">
 
-## Features
+![Version](https://img.shields.io/badge/version-0.0.1-blue.svg?cacheSeconds=2592000)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#)
+[![VSCode Extension](https://img.shields.io/badge/VSCode-Extension-blue.svg?logo=visual-studio-code)](https://code.visualstudio.com/api/references/extension-guidelines)
+[![MCP Client](https://img.shields.io/badge/MCP-Client-green.svg)](https://modelcontextprotocol.io/clients)
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+</div>
 
-For example if there is an image subfolder under your extension project workspace:
+> A powerful VSCode extension that acts as a Model Context Protocol (MCP) client, enabling seamless integration between MCP tool servers and GitHub Copilot Chat. Join the growing ecosystem of interoperable AI applications with flexible integration options.
 
-\!\[feature X\]\(images/feature-x.png\)
+## ✨ Features
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+- 🔧 **MCP Server Management**: Connect and manage multiple MCP servers through an intuitive UI
+- 🚀 **Copilot Integration**: Expose MCP tools directly to GitHub Copilot Chat participants
+- 🎯 **Tool Discovery**: Automatically discover and surface available tools from connected MCP servers
+- ⚡ **Server Health Monitoring**: Real-time monitoring of MCP server status and connections
+- 🔄 **Automatic Connection Management**: Seamless handling of MCP server connections and reconnections
+- 🛠️ **Tool Invocation Support**: Full support for MCP tool invocation through Copilot Chat
 
-## Requirements
+## 🎯 MCP Feature Support
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+| Feature | Support |
+|---------|----------|
+| Tools | ✅ Full support |
+| Resources | ✅ Full support |
+| Prompts | ✅ Full support |
+| Sampling | ❌ Not supported |
+| Roots | ❌ Not supported |
 
-## Extension Settings
+## 📦 Installation
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+1. Install the extension from the VSCode Marketplace
+2. Configure your MCP servers through the extension settings
+3. Start using GitHub Copilot Chat with your MCP tools!
 
-For example:
+## 🛠️ Configuration
 
-This extension contributes the following settings:
+Configure your MCP servers in VSCode settings:
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+```json
+{
+  "mcpManager.servers": [
+    {
+      "id": "unique-server-id",
+      "name": "My MCP Server",
+      "command": "start-server-command",
+      "enabled": true
+    }
+  ]
+}
+```
 
-## Known Issues
+### Server Configuration Properties
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | string | Unique identifier for the server |
+| `name` | string | Display name for the server |
+| `command` | string | Command to start the server |
+| `enabled` | boolean | Whether the server is enabled |
 
-## Release Notes
+## 🚀 Usage
 
-Users appreciate release notes as you update your extension.
+1. Open the MCP Servers view from the VSCode activity bar
+2. Add and configure your MCP servers
+3. Enable/disable servers as needed
+4. Use GitHub Copilot Chat with your connected MCP tools using the `@mcp` participant
+5. View server status and tool availability in real-time
 
-### 1.0.0
+## 🔗 Requirements
 
-Initial release of ...
+- VSCode 
+- GitHub Copilot Chat extension
+- Compatible MCP servers (see [Example Servers](https://modelcontextprotocol.io/servers))
 
-### 1.0.1
+## 🌟 Benefits
 
-Fixed issue #.
+- Enable Copilot to use custom context and tools through MCP
+- Join the growing ecosystem of interoperable AI applications
+- Support local-first AI workflows
+- Flexible integration options for your development workflow
 
-### 1.1.0
+## 👥 Contributing
 
-Added features X, Y, and Z.
+Contributions, issues and feature requests are welcome!
+Feel free to check the [issues page](https://github.com/yourusername/copilot-mcp/issues).
+
+## ✍️ Author
+
+**Vikash Loomba**
+
+* Website: https://automatalabs.io
+* Github: [@vikashloomba](https://github.com/vikashloomba)
+
+## 📝 License
+
+Copyright © 2024 [Vikash Loomba](https://automatalabs.io).
+
+This project is [MIT](LICENSE) licensed.
 
 ---
 
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+_Part of the [MCP Client Ecosystem](https://modelcontextprotocol.io/clients) - Enabling interoperable AI tools for developers_ ⭐️
