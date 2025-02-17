@@ -5,6 +5,7 @@
     "name": "Vikash Loomba",
     "url": "https://automatalabs.io"
   },
+  "license": "GPL-3.0",
   "publisher": "AutomataLabs",
   "repository": {
     "url": "https://github.com/vikashloomba/copilot-mcp",
