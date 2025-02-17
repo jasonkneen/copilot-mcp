@@ -1,18 +1,23 @@
-name: Update Version Badge
+name: Update Version and Create Tag
 
 on:
   push:
     paths:
       - 'package.json'
+    branches:
+      - main
 
 jobs:
   update-version:
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore:') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
     
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -33,4 +38,11 @@ jobs:
         git config --global user.email 'actions@github.com'
         git add README.md
         git diff --staged --quiet || git commit -m "docs: update version badge to ${{ steps.get_version.outputs.version }}"
-        git push 
+        git push
+
+    - name: Create and push tag
+      run: |
+        if ! git rev-parse "v${{ steps.get_version.outputs.version }}" >/dev/null 2>&1; then
+          git tag -a "v${{ steps.get_version.outputs.version }}" -m "Release version ${{ steps.get_version.outputs.version }}"
+          git push origin "v${{ steps.get_version.outputs.version }}"
+        fi 

@@ -2,24 +2,14 @@ name: Build and Release Extension
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
-    paths-ignore:
-      - 'docs/**'
-  release:
-    types:
-      - created
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+  release:
+    runs-on: ubuntu-latest
     permissions:
-      contents: write # This permission is required for creating releases
+      contents: write
     
     steps:
     - uses: actions/checkout@v4
@@ -33,41 +23,28 @@ jobs:
         
     - name: Install dependencies
       run: npm install && npm ci
-      
-    - name: Configure Git
-      run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
         
-    - name: Commit package-lock.json if changed
-      run: |
-        git add package-lock.json
-        git diff --staged --quiet || git commit -m "Update package-lock.json [skip ci]"
-        
-    - name: Get package version
+    - name: Get version from tag
       id: get_version
-      run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-      
+      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        
     - name: Create Release
       id: create_release
-      if: startsWith(github.ref, 'refs/tags/')
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.ref_name }}
+        tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref_name }}
         draft: false
         prerelease: false
         
     - name: Publish
-      if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'ubuntu-latest'
       run: npm run deploy
       env:
         VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
       
     - name: Upload Release Asset
-      if: startsWith(github.ref, 'refs/tags/')
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
