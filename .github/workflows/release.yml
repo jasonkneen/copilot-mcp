@@ -73,12 +73,7 @@ jobs:
         release_name: Release v${{ steps.get_version.outputs.version }}
         draft: false
         prerelease: false
-        
-    - name: Publish
-      run: npm run deploy
-      env:
-        VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
-      
+
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
       env:
@@ -87,4 +82,11 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./copilot-mcp-${{ steps.get_version.outputs.version }}.vsix
         asset_name: copilot-mcp-${{ steps.get_version.outputs.version }}.vsix
-        asset_content_type: application/octet-stream 
+        asset_content_type: application/octet-stream
+        
+    - name: Publish
+      run: npm run deploy
+      env:
+        VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
+      
+ 
