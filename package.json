@@ -1,5 +1,10 @@
 {
   "name": "copilot-mcp",
+  "author": {
+    "email": "vikash@automatalabs.io",
+    "name": "Vikash Loomba",
+    "url": "https://automatalabs.io"
+  },
   "displayName": "copilot-mcp",
   "description": "Manage Model Context Protocol (MCP) tool servers and expose their tools to Copilot participants",
   "version": "0.0.1",
