@@ -5,6 +5,11 @@
     "name": "Vikash Loomba",
     "url": "https://automatalabs.io"
   },
+  "publisher": "Automata Labs",
+  "repository": {
+    "url": "https://github.com/vikashloomba/copilot-mcp",
+    "type": "git"
+  },
   "displayName": "copilot-mcp",
   "description": "Manage Model Context Protocol (MCP) tool servers and expose their tools to Copilot participants",
   "version": "0.0.1",
