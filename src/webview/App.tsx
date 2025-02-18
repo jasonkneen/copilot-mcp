@@ -4,23 +4,18 @@ import '@/styles/globals.css';
 import { ServerConfig, ServerWithTools } from './types';
 import { ServerCard } from './components/ServerCard';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+
 interface BaseModalProps {
     isOpen: boolean;
     onClose: () => void;
 }
 
 interface AddServerModalProps extends BaseModalProps {
-    mode: 'add';
-    onSubmit: (name: string, command: string) => void;
+    onSubmit: (name: string, command: string, env?: { [key: string]: string }) => void;
 }
 
-interface EditServerModalProps extends BaseModalProps {
-    mode: 'edit';
-    server: ServerConfig;
-    onSubmit: (id: string, name: string, command: string) => void;
-}
-
-type ServerModalProps = AddServerModalProps | EditServerModalProps;
+type ServerModalProps = AddServerModalProps;
 
 declare global {
     interface Window {
@@ -28,26 +23,21 @@ declare global {
     }
 }
 
-function isEditMode(props: ServerModalProps): props is EditServerModalProps {
-    return props.mode === 'edit';
-}
-
 function ServerModal(props: ServerModalProps) {
     const [name, setName] = useState('');
     const [command, setCommand] = useState('');
+    const [envVars, setEnvVars] = useState<{ key: string; value: string }[]>([]);
     const [error, setError] = useState<string | null>(null);
 
-    // Reset form when modal opens/closes or server changes
+    // Reset form when modal opens/closes
     useEffect(() => {
-        if (props.isOpen && isEditMode(props)) {
-            setName(props.server.name);
-            setCommand(props.server.command);
-        } else if (!props.isOpen) {
+        if (!props.isOpen) {
             setName('');
             setCommand('');
+            setEnvVars([]);
             setError(null);
         }
-    }, [props.isOpen, isEditMode(props) ? props.server : null]);
+    }, [props.isOpen]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -62,14 +52,32 @@ function ServerModal(props: ServerModalProps) {
             return;
         }
 
-        if (isEditMode(props)) {
-            props.onSubmit(props.server.id, name.trim(), command.trim());
-        } else {
-            props.onSubmit(name.trim(), command.trim());
-        }
+        // Convert envVars array to object
+        const env = envVars.reduce((acc, { key, value }) => {
+            if (key.trim()) {
+                acc[key.trim()] = value;
+            }
+            return acc;
+        }, {} as { [key: string]: string });
+
+        props.onSubmit(name.trim(), command.trim(), env);
         
         setError(null);
         props.onClose();
+    };
+
+    const addEnvVar = () => {
+        setEnvVars([...envVars, { key: '', value: '' }]);
+    };
+
+    const removeEnvVar = (index: number) => {
+        setEnvVars(envVars.filter((_, i) => i !== index));
+    };
+
+    const updateEnvVar = (index: number, field: 'key' | 'value', value: string) => {
+        const newEnvVars = [...envVars];
+        newEnvVars[index][field] = value;
+        setEnvVars(newEnvVars);
     };
 
     if (!props.isOpen) return null;
@@ -78,7 +86,7 @@ function ServerModal(props: ServerModalProps) {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
             <div className="w-full max-w-md p-6 rounded-lg bg-[var(--vscode-editor-background)] border border-[var(--vscode-widget-border)] text-[var(--vscode-editor-foreground)]">
                 <h3 className="text-xl font-semibold mb-4">
-                    {isEditMode(props) ? 'Edit MCP Server' : 'Add MCP Server'}
+                    Add MCP Server
                 </h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {error && (
@@ -112,6 +120,47 @@ function ServerModal(props: ServerModalProps) {
                             className="w-full p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-2 focus:ring-[var(--vscode-focusBorder)]"
                         />
                     </div>
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium">Environment Variables:</label>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={addEnvVar}
+                                className="text-sm hover:bg-[var(--vscode-button-hoverBackground)]"
+                            >
+                                Add Variable
+                            </Button>
+                        </div>
+                        <div className="space-y-2">
+                            {envVars.map((envVar, index) => (
+                                <div key={index} className="flex gap-2">
+                                    <Input
+                                        type="text"
+                                        value={envVar.key}
+                                        onChange={(e) => updateEnvVar(index, 'key', e.target.value)}
+                                        placeholder="KEY"
+                                        className="flex-1 p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-2 focus:ring-[var(--vscode-focusBorder)]"
+                                    />
+                                    <Input
+                                        type="text"
+                                        value={envVar.value}
+                                        onChange={(e) => updateEnvVar(index, 'value', e.target.value)}
+                                        placeholder="value"
+                                        className="flex-1 p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-2 focus:ring-[var(--vscode-focusBorder)]"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() => removeEnvVar(index)}
+                                        className="hover:bg-[var(--vscode-errorForeground)]/10"
+                                    >
+                                        ×
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                     <div className="flex justify-end space-x-2 mt-6">
                         <Button
                             type="button"
@@ -125,7 +174,7 @@ function ServerModal(props: ServerModalProps) {
                             type="submit"
                             className="bg-[var(--vscode-button-background)] hover:bg-[var(--vscode-button-hoverBackground)] text-[var(--vscode-button-foreground)]"
                         >
-                            {isEditMode(props) ? 'Save Changes' : 'Add Server'}
+                            Add Server
                         </Button>
                     </div>
                 </form>
@@ -137,8 +186,8 @@ function ServerModal(props: ServerModalProps) {
 export function App() {
     const [servers, setServers] = useState<ServerWithTools[]>([]);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [editingServer, setEditingServer] = useState<ServerConfig | null>(null);
     const [expandedServer, setExpandedServer] = useState<string | null>(null);
+    const [filterQuery, setFilterQuery] = useState('');
 
     useEffect(() => {
         // Listen for messages from the extension
@@ -146,16 +195,14 @@ export function App() {
             const message = event.data;
             switch (message.type) {
                 case 'setServers':
-                    setServers(message.servers.map((server: ServerConfig) => ({
-                        ...server,
-                        tools: []
-                    })));
+                    console.log('Setting servers:', message.servers);
+                    setServers(() => [...message.servers]);  // Don't reset tools array
                     break;
                 case 'updateServer':
                     setServers(current => 
                         current.map(server => 
                             server.id === message.server.id 
-                                ? { ...message.server, tools: message.tools || [] }
+                                ? { ...message.server, tools: message.tools || server.tools }  // Preserve existing tools if none provided
                                 : server
                         )
                     );
@@ -176,42 +223,65 @@ export function App() {
         window.vscodeApi.postMessage({ type: 'getServers' });
     }, []);
 
-    const handleAddServer = (name: string, command: string) => {
+    const handleAddServer = (name: string, command: string, env?: { [key: string]: string }) => {
         window.vscodeApi.postMessage({
             type: 'addServer',
             server: {
                 name,
                 command,
-                enabled: true
+                enabled: true,
+                env
             }
         });
     };
 
-    const handleEditServer = (id: string, name: string, command: string) => {
-        window.vscodeApi.postMessage({
-            type: 'editServer',
-            server: {
-                id,
-                name,
-                command
-            }
-        });
-        setEditingServer(null);
-    };
+    const filteredServers = servers.filter(server => 
+        server.name.toLowerCase().includes(filterQuery.toLowerCase())
+    );
 
     return (
         <div className="flex flex-col min-h-screen p-4 bg-[var(--vscode-panel-background)]">
             <header className="mb-6">
                 <h2 className="text-xl font-semibold text-[var(--vscode-editor-foreground)]">MCP Server Manager</h2>
             </header>
+            <div className="flex justify-between items-center mb-4">
+                <div className="relative flex-1 max-w-md">
+                    <Input
+                        type="text"
+                        placeholder="Filter servers..."
+                        value={filterQuery}
+                        onChange={(e) => setFilterQuery(e.target.value)}
+                        className="w-full bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border-[var(--vscode-input-border)]"
+                    />
+                    {filterQuery && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setFilterQuery('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-[var(--vscode-button-hoverBackground)]"
+                        >
+                            ×
+                        </Button>
+                    )}
+                </div>
+                <Button
+                    className="ml-4 bg-[var(--vscode-button-background)] hover:bg-[var(--vscode-button-hoverBackground)] text-[var(--vscode-button-foreground)]"
+                    onClick={() => setIsAddModalOpen(true)}
+                >
+                    Add Server
+                </Button>
+            </div>
             <div className="flex-1 w-full max-w-7xl mx-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {servers.length === 0 ? (
+                    {filteredServers.length === 0 ? (
                         <div className="col-span-full p-6 text-center rounded-md border border-[var(--vscode-widget-border)] bg-[var(--vscode-editor-background)] text-[var(--vscode-descriptionForeground)]">
-                            No servers configured yet. Click "Add Server" to get started.
+                            {servers.length === 0 
+                                ? 'No servers configured yet. Click "Add Server" to get started.'
+                                : 'No servers match your filter criteria.'
+                            }
                         </div>
                     ) : (
-                        servers.map(server => (
+                        filteredServers.map(server => (
                             <ServerCard
                                 className='bg-[var(--vscode-editor-background)] border border-[var(--vscode-widget-border)] rounded'
                                 key={server.id}
@@ -221,29 +291,11 @@ export function App() {
                     )}
                 </div>
             </div>
-            <div className="mt-6 flex justify-end">
-                <Button
-                    className="bg-[var(--vscode-button-background)] hover:bg-[var(--vscode-button-hoverBackground)] text-[var(--vscode-button-foreground)]"
-                    onClick={() => setIsAddModalOpen(true)}
-                >
-                    Add Server
-                </Button>
-            </div>
             <ServerModal
-                mode="add"
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
                 onSubmit={handleAddServer}
             />
-            {editingServer && (
-                <ServerModal
-                    mode="edit"
-                    isOpen={true}
-                    onClose={() => setEditingServer(null)}
-                    onSubmit={handleEditServer}
-                    server={editingServer}
-                />
-            )}
         </div>
     );
 }

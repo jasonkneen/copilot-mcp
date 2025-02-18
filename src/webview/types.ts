@@ -3,6 +3,7 @@ export interface ServerConfig {
     name: string;
     command: string;
     enabled: boolean;
+    env?: { [key: string]: string };
 }
 
 export interface Tool {
@@ -13,4 +14,9 @@ export interface Tool {
 
 export interface ServerWithTools extends ServerConfig {
     tools: Tool[];
+}
+
+export interface EnvVar {
+    key: string;
+    value: string;
 }

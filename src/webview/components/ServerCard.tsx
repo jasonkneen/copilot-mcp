@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Pencil, Save, Trash } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -45,14 +45,37 @@ export const ServerCard = ({ className, server }: ServerCardProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState(server.name);
     const [editCommand, setEditCommand] = useState(server.command);
+    const [editEnvVars, setEditEnvVars] = useState<{ key: string; value: string }[]>([]);
+    const [newEnvKey, setNewEnvKey] = useState('');
+    const [newEnvValue, setNewEnvValue] = useState('');
 
-    const handleEditServer = (name: string, command: string) => {
+    useEffect(() => {
+        // Convert env object to array when editing starts
+        if (isEditing && server.env) {
+            setEditEnvVars(Object.entries(server.env).map(([key, value]) => ({ key, value })));
+        } else {
+            setEditEnvVars([]);
+            setNewEnvKey('');
+            setNewEnvValue('');
+        }
+    }, [isEditing, server.env]);
+
+    const handleEditServer = (name: string, command: string, envVars: { key: string; value: string }[]) => {
+        // Convert envVars array to object
+        const env = envVars.reduce((acc, { key, value }) => {
+            if (key.trim()) {
+                acc[key.trim()] = value;
+            }
+            return acc;
+        }, {} as { [key: string]: string });
+
         window.vscodeApi.postMessage({
             type: 'editServer',
             server: {
                 id: server.id,
                 name,
-                command
+                command,
+                env
             }
         });
         setIsEditing(false);
@@ -60,29 +83,64 @@ export const ServerCard = ({ className, server }: ServerCardProps) => {
 
     const handleSave = () => {
         if (editName.trim() && editCommand.trim()) {
-            handleEditServer(editName.trim(), editCommand.trim());
+            handleEditServer(editName.trim(), editCommand.trim(), editEnvVars);
         }
     };
 
     const handleCancel = () => {
         setEditName(server.name);
         setEditCommand(server.command);
+        setEditEnvVars([]);
         setIsEditing(false);
+    };
+
+    const handleAddNewEnvVar = () => {
+        if (newEnvKey.trim()) {
+            setEditEnvVars([...editEnvVars, { key: newEnvKey.trim(), value: newEnvValue }]);
+            setNewEnvKey('');
+            setNewEnvValue('');
+        }
+    };
+
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && newEnvKey.trim()) {
+            handleAddNewEnvVar();
+        }
+    };
+
+    const updateEnvVar = (index: number, field: 'key' | 'value', value: string) => {
+        const newEnvVars = [...editEnvVars];
+        newEnvVars[index][field] = value;
+        setEditEnvVars(newEnvVars);
+    };
+
+    const removeEnvVar = (index: number) => {
+        setEditEnvVars(editEnvVars.filter((_, i) => i !== index));
     };
 
     return (
         <Card className={cn("w-full h-full flex flex-col text-[var(--vscode-editor-foreground)]", className)}>
             <CardHeader className="relative flex-shrink-0">
-                <Button 
-                    variant="ghost" 
-                    size="icon"
-                    className="absolute right-4 top-4 hover:bg-[var(--vscode-button-hoverBackground)]"
-                    onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                >
-                    {isEditing ? <Save className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-                </Button>
                 {isEditing ? (
                     <div className="space-y-2 w-full pr-12">
+                        <div className="absolute right-4 top-4 flex gap-2">
+                            <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={handleCancel}
+                                className="hover:bg-[var(--vscode-button-hoverBackground)]"
+                            >
+                                ×
+                            </Button>
+                            <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={handleSave}
+                                className="hover:bg-[var(--vscode-button-hoverBackground)]"
+                            >
+                                <Save className="h-4 w-4" />
+                            </Button>
+                        </div>
                         <Input
                             type="text"
                             value={editName}
@@ -95,17 +153,17 @@ export const ServerCard = ({ className, server }: ServerCardProps) => {
                             onChange={(e) => setEditCommand(e.target.value)}
                             className="text-sm w-full text-[var(--vscode-descriptionForeground)] bg-[var(--vscode-input-background)] border-[var(--vscode-input-border)]"
                         />
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={handleCancel}
-                            className="mt-2 hover:bg-[var(--vscode-button-hoverBackground)]"
-                        >
-                            Cancel
-                        </Button>
                     </div>
                 ) : (
                     <>
+                        <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="absolute right-4 top-4 hover:bg-[var(--vscode-button-hoverBackground)]"
+                            onClick={() => setIsEditing(true)}
+                        >
+                            <Pencil className="h-4 w-4" />
+                        </Button>
                         <CardTitle className="text-[var(--vscode-editor-foreground)] pr-12">{server.name}</CardTitle>
                         <CardDescription className="text-[var(--vscode-descriptionForeground)] break-words">{server.command}</CardDescription>
                     </>
@@ -113,11 +171,11 @@ export const ServerCard = ({ className, server }: ServerCardProps) => {
             </CardHeader>
             <CardContent className="grid gap-4 flex-1">
                 <span className="w-full flex justify-between items-center text-[var(--vscode-descriptionForeground)]">
-                    <span>{server.tools.length} tool{server.tools.length !== 1 ? 's' : ''} available</span>
+                    <span>{server.tools?.length} tool{server.tools?.length !== 1 ? 's' : ''} available</span>
                 </span>
 
                 <div className="flex-1 overflow-auto">
-                    {server.tools.map((tool, index) => (
+                    {server.tools?.map((tool, index) => (
                         <Collapsible
                             key={tool.name}
                             open={expandedTool === tool.name}
@@ -139,6 +197,80 @@ export const ServerCard = ({ className, server }: ServerCardProps) => {
                             </div>
                         </Collapsible>
                     ))}
+                </div>
+
+                <div className="mt-4 p-4 rounded-md border border-[var(--vscode-widget-border)] bg-[var(--vscode-editor-background)]">
+                    <p className="text-sm font-medium mb-2">Environment Variables:</p>
+                    {isEditing ? (
+                        <div className="space-y-2">
+                            <div className="flex gap-2">
+                                <Input
+                                    type="text"
+                                    placeholder="KEY"
+                                    value={newEnvKey}
+                                    onChange={(e) => setNewEnvKey(e.target.value)}
+                                    onKeyPress={handleKeyPress}
+                                    className="flex-1 text-sm bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border-[var(--vscode-input-border)]"
+                                />
+                                <Input
+                                    type="text"
+                                    placeholder="value"
+                                    value={newEnvValue}
+                                    onChange={(e) => setNewEnvValue(e.target.value)}
+                                    onKeyPress={handleKeyPress}
+                                    className="flex-1 text-sm bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border-[var(--vscode-input-border)]"
+                                />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={handleAddNewEnvVar}
+                                    className="hover:bg-[var(--vscode-button-hoverBackground)]"
+                                >
+                                    +
+                                </Button>
+                            </div>
+                            {editEnvVars.map((envVar, index) => (
+                                <div key={index} className="flex gap-2">
+                                    <Input
+                                        type="text"
+                                        value={envVar.key}
+                                        onChange={(e) => updateEnvVar(index, 'key', e.target.value)}
+                                        placeholder="KEY"
+                                        className="flex-1 text-sm bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border-[var(--vscode-input-border)]"
+                                    />
+                                    <Input
+                                        type="text"
+                                        value={envVar.value}
+                                        onChange={(e) => updateEnvVar(index, 'value', e.target.value)}
+                                        placeholder="value"
+                                        className="flex-1 text-sm bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border-[var(--vscode-input-border)]"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() => removeEnvVar(index)}
+                                        className="hover:bg-[var(--vscode-errorForeground)]/10"
+                                    >
+                                        ×
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        server.env && Object.keys(server.env).length > 0 ? (
+                            <div className="space-y-1">
+                                {Object.entries(server.env).map(([key, value]) => (
+                                    <div key={key} className="text-sm text-[var(--vscode-descriptionForeground)]">
+                                        <span className="font-medium">{key}</span>: {value}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-[var(--vscode-descriptionForeground)]">
+                                No environment variables configured
+                            </p>
+                        )
+                    )}
                 </div>
 
                 <div className="flex items-center space-x-4 rounded-md border border-[var(--vscode-widget-border)] p-4 bg-[var(--vscode-editor-background)]">
