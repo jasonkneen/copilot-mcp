@@ -4,6 +4,11 @@
 
 <img src="logo.png" alt="Copilot MCP Logo" width="200" />
 
+<div style="display: flex; justify-content: center; gap: 20px; margin: 20px 0;">
+  <img src="media/controls.png" alt="MCP Controls" width="400" />
+  <img src="media/image.png" alt="MCP Interface" width="400" />
+</div>
+
 ![Version](https://img.shields.io/badge/version-0.0.7-blue.svg?cacheSeconds=2592000)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![VSCode Extension](https://img.shields.io/badge/VSCode-Extension-blue.svg?logo=visual-studio-code)](https://code.visualstudio.com/api/references/extension-guidelines)
@@ -27,10 +32,10 @@
 | Feature | Support |
 |---------|----------|
 | Tools | ✅ Full support |
-| Resources | ✅ Full support |
-| Prompts | ✅ Full support |
-| Sampling | ❌ Not supported |
-| Roots | ❌ Not supported |
+| Resources | ✅* Full support (coming soon) |
+| Prompts | ✅* Full support (coming soon) |
+| Sampling | ⏳ Planned |
+| Roots | ⏳ Planned |
 
 ## 📦 Installation
 
@@ -40,7 +45,11 @@
 
 ## 🛠️ Configuration
 
-Configure your MCP servers in VSCode settings:
+You can configure your MCP servers in the UI or in VSCode settings.
+
+In the UI, look for the "MCP Servers" button in the activity bar.
+
+To configure your MCP servers in VSCode settings:
 
 ```json
 {
