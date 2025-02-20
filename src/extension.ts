@@ -6,7 +6,7 @@ import * as crypto from 'crypto';
 import { ChildProcess, spawn } from 'child_process';
 import { Client as MCPClient } from "@modelcontextprotocol/sdk/client/index";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio";
-import { CallToolRequest, Notification, Tool } from "@modelcontextprotocol/sdk/types";
+import { CallToolRequest, Resource, Tool } from "@modelcontextprotocol/sdk/types";
 import { sendChatParticipantRequest } from '@vscode/chat-extension-utils';
 
 
@@ -23,6 +23,7 @@ interface ServerProcess {
 	outputChannel: vscode.OutputChannel;
 	mcpClient?: MCPClient;
 	tools: Tool[];
+	resources: Resource[];
 }
 
 // This method is called when your extension is activated
@@ -59,6 +60,20 @@ export function activate(context: vscode.ExtensionContext) {
 		// Store provider reference for cleanup
 		context.subscriptions.push({ dispose: () => provider.dispose() });
 		const copilotMCP = vscode.chat.createChatParticipant('copilot-mcp.mcp', provider.chatHandler);
+		copilotMCP.followupProvider = {
+			provideFollowups(result, context, token) {
+				console.log("Followup request:", result);
+				if (result.metadata?.command === 'readResource') {
+					return [
+						{
+							label: 'Read Resource',
+							command: 'copilot-mcp.readResource',
+							prompt: 'Read the resource'
+						}
+					];
+				}
+			},
+		};
 		console.log('copilot-mcp extension activated successfully');
 	} catch (error) {
 		console.error('Error during extension activation:', error);
@@ -80,6 +95,8 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 	private _processes: Map<string, ServerProcess> = new Map();
 	private _toolRegistrations: Map<string, vscode.Disposable[]> = new Map();
 	private _toolInstances: vscode.LanguageModelChatTool[] = [];
+	private _resourceRegistrations: Map<string, vscode.Disposable[]> = new Map();
+	private _resourceInstances: Resource[] = [];
 
 	constructor(
 		private readonly _extensionUri: vscode.Uri,
@@ -95,6 +112,29 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 					vscode.window.showErrorMessage(`Failed to auto-start server "${server.name}": ${error instanceof Error ? error.message : 'Unknown error'}`);
 				}));
 		});
+		const readResourceHandler = async (uri: string) => {
+			const resource = this._resourceInstances.find(r => r.uri === uri);
+			if (resource) {
+				// read the resource
+				const resourceContent = Array.from(this._processes.values()).flatMap(async process =>  await process.mcpClient?.readResource({ uri: resource.uri }));
+				for (const item of resourceContent) {
+					const resolvedItem = await item;
+					resolvedItem?.contents.forEach(content => {
+						if (typeof content.text === 'string') {
+							
+							return content.text;
+						} else {
+							return 'Unsupported resource type';
+						}
+					});
+				}
+			} else {
+				return 'Resource not found';
+			}
+			
+			return 'Click one of the buttons to read the resource';
+		};
+		vscode.commands.registerCommand(`copilot-mcp.readResource`, readResourceHandler);
 	}
 
 	public chatHandler: vscode.ChatRequestHandler = async (
@@ -103,6 +143,36 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 		stream: vscode.ChatResponseStream,
 		token: vscode.CancellationToken
 	  ): Promise<any> => {
+		if(request.command === 'listResources') {
+			console.log("Command:", request.command);
+			const resources = Array.from(this._processes.values()).flatMap(process => process.resources);
+			if (resources.length === 0) {
+				stream.push(new vscode.ChatResponseMarkdownPart(new vscode.MarkdownString("No resources found")));
+				return;
+			}
+			const markdown = new vscode.MarkdownString();
+			markdown.supportHtml = true;
+			markdown.appendMarkdown(`<h2>Resources</h2>`);
+			for (const resource of resources) {
+				markdown.appendMarkdown(`<strong>${resource.name}:</strong>`);
+				// for the resource text, if the mime type is text/plain, then just return the text
+				// for octet-stream, check if there is a blob property assume base64 encoded and decode it
+				if (resource.mimeType === 'text/plain') {
+					markdown.appendMarkdown(`<p>${resource.text}</p>`);
+				} else if (resource.mimeType === 'application/octet-stream') {
+					if (resource.blob) {
+						markdown.appendMarkdown(`<p>${Buffer.from(resource.blob as string, 'base64').toString('utf-8')}</p>`);
+					} else {
+						markdown.appendMarkdown(`<p>No contents could be displayed</p>`);
+					}
+				} 
+				markdown.appendMarkdown(`<p>URI: ${resource.uri}</p>`);
+				markdown.appendMarkdown('<hr>');
+			}
+			stream.push(new vscode.ChatResponseMarkdownPart(markdown));
+			return;
+		}
+		
 		const tools = this.getAllTools();
 		console.log("Available tools:", tools);
 		const chatResult = sendChatParticipantRequest(request, context, {
@@ -208,6 +278,32 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 		});
 	}
 
+	private async _registerResources(serverId: string, client: MCPClient, resources: Resource[]) {
+		const registrations: vscode.Disposable[] = [];
+
+		for (const resource of resources) {
+			try {
+				const command = `copilot-mcp.${resource.name}`;
+
+				const commandHandler = async (uri: string) => {
+					const resource = this._processes.get(serverId)?.resources.find(r => r.uri === uri);
+					if (resource) {
+						console.log('Resource:', resource);
+						const resourceContent = await client.readResource({ uri: resource.uri });
+						console.log('Resource content:', resourceContent);
+						this._resourceInstances.push(resource);
+					}
+				};
+				console.log('Registering resource:', resource.name);
+				const registration = vscode.commands.registerCommand(command, commandHandler);
+				registrations.push(registration);
+			} catch (error) {
+				console.error(`Failed to register resource:`, resource.name, error);
+			}
+		}
+		this._resourceRegistrations.set(serverId, registrations);
+	}
+
 	private async _registerTools(serverId: string, client: MCPClient, tools: Tool[]) {
 		// Unregister any existing tools for this server
 		await this._unregisterTools(serverId);
@@ -278,8 +374,8 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 			
 			// Create MCP client
 			const client = new MCPClient(
-				{ name: "vscode-extension", version: "1.0" },
-				{ capabilities: { tools: {} } }
+				{ name: "copilot-mcp", version: "1.0" },
+				{ capabilities: { tools: {}, resources: {}, prompts: {} } }
 			);
 
 			// Parse command and arguments
@@ -291,11 +387,22 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 			// Connect client
 			await client.connect(transport);
 			outputChannel.appendLine('MCP client connected successfully');
-
+			
 			// Get initial tool list
 			const toolsResponse = await client.listTools();
 			const tools = (toolsResponse.tools ?? []);
 			outputChannel.appendLine(`Retrieved ${tools.length} tools from server`);
+
+			// Get initial resource list
+			let resources: Resource[] = [];
+			try {
+				const resourcesResponse = await client.listResources();
+				resources = (resourcesResponse.resources ?? []);
+				outputChannel.appendLine(`Retrieved ${resources.length} resources from server`);
+			} catch (error) {
+				outputChannel.appendLine(`Error retrieving resources: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			}
+
 
 			// Store client and tools
 			const serverProcess = this._processes.get(serverId);
@@ -303,10 +410,10 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 			
 			serverProcess.mcpClient = client;
 			serverProcess.tools = tools;
-			
+			serverProcess.resources = resources;
 			// Register tools with VS Code
 			await this._registerTools(serverId, client, tools);
-
+			await this._registerResources(serverId, client, resources);
 			// Set up tool list update handler
 			const updateToolList = async () => {
 				try {
@@ -375,7 +482,7 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 			});
 
 			// Store process and output channel
-			this._processes.set(server.id, { process: serverProcess, outputChannel, tools: [] });
+			this._processes.set(server.id, { process: serverProcess, outputChannel, tools: [], resources: [] });
 
 			// Handle process output
 			serverProcess.stdout?.on('data', (data: Buffer) => {
@@ -640,6 +747,10 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 				}
 			});
 		});
+	}
+
+	public getAllResources(): Resource[] {
+		return this._resourceInstances;
 	}
 }
 
