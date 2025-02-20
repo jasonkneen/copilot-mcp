@@ -32,7 +32,7 @@
 | Feature | Support |
 |---------|----------|
 | Tools | ✅ Full support |
-| Resources | ✅* Full support (coming soon) |
+| Resources | ✅* Text resource support |
 | Prompts | ✅* Full support (coming soon) |
 | Sampling | ⏳ Planned |
 | Roots | ⏳ Planned |
