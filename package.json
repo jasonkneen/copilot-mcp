@@ -12,14 +12,35 @@
   },
   "displayName": "Copilot MCP",
   "description": "VSCode extension that acts as a Model Context Protocol (MCP) client, enabling integration between MCP servers and GitHub Copilot Chat",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "icon": "logo.png",
   "engines": {
     "vscode": "^1.97.0"
   },
-  "categories": [
-    "Other"
-  ],
+	"categories": [
+		"AI",
+		"Chat",
+		"Programming Languages",
+		"Education",
+		"Snippets",
+		"Testing"
+	],
+	"keywords": [
+		"chat-participant",
+    "copilot",
+    "copilot-mcp",
+    "chat-participant-utils",
+    "dev",
+		"mcp",
+		"openrouter",
+		"coding",
+		"agent",
+		"autonomous",
+		"chatgpt",
+		"sonnet",
+		"ai",
+		"llama"
+	],
   "activationEvents": [
     "onStartupFinished"
   ],
