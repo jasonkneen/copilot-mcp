@@ -183,6 +183,31 @@ function ServerModal(props: ServerModalProps) {
     );
 }
 
+const handleWebviewMessage = (event: MessageEvent) => {
+    const message = event.data;
+    switch (message.type) {
+        case 'setServers':
+            console.log('Setting servers:', message.servers);
+            return message.servers;
+        case 'updateServer':
+            return (current: ServerWithTools[]) => 
+                current.map(server => 
+                    server.id === message.server.id 
+                        ? { ...message.server, tools: message.tools || server.tools }
+                        : server
+                );
+        case 'updateServerTools':
+            return (current: ServerWithTools[]) =>
+                current.map(server =>
+                    server.id === message.serverId
+                        ? { ...server, tools: message.tools }
+                        : server
+                );
+        default:
+            return undefined;
+    }
+};
+
 export function App() {
     const [servers, setServers] = useState<ServerWithTools[]>([]);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -191,36 +216,23 @@ export function App() {
 
     useEffect(() => {
         // Listen for messages from the extension
-        window.addEventListener('message', event => {
-            const message = event.data;
-            switch (message.type) {
-                case 'setServers':
-                    console.log('Setting servers:', message.servers);
-                    setServers(() => [...message.servers]);  // Don't reset tools array
-                    break;
-                case 'updateServer':
-                    setServers(current => 
-                        current.map(server => 
-                            server.id === message.server.id 
-                                ? { ...message.server, tools: message.tools || server.tools }  // Preserve existing tools if none provided
-                                : server
-                        )
-                    );
-                    break;
-                case 'updateServerTools':
-                    setServers(current =>
-                        current.map(server =>
-                            server.id === message.serverId
-                                ? { ...server, tools: message.tools }
-                                : server
-                        )
-                    );
-                    break;
+        const messageHandler = (event: MessageEvent) => {
+            const result = handleWebviewMessage(event);
+            if (typeof result === 'function') {
+                setServers(result);
+            } else if (Array.isArray(result)) {
+                setServers(result);
             }
-        });
+        };
+
+        window.addEventListener('message', messageHandler);
 
         // Request initial server list
         window.vscodeApi.postMessage({ type: 'getServers' });
+
+        return () => {
+            window.removeEventListener('message', messageHandler);
+        }
     }, []);
 
     const handleAddServer = (name: string, command: string, env?: { [key: string]: string }) => {

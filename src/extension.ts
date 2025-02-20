@@ -213,15 +213,19 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 						break;
 
 					case 'addServer':
+						console.log("Received addServer message:", message);
 						const newServer: ServerConfig = {
 							id: crypto.randomUUID(),
 							name: message.server?.name || 'Unnamed Server',
 							command: message.server?.command || '',
-							enabled: false
+							enabled: message.server?.enabled || false,
+							env: message.server?.env || {}
 						};
 						this._servers.push(newServer);
 						await this._saveServers();
 						this._view?.webview.postMessage({ type: 'setServers', servers: this._servers });
+						await this._startServer(newServer);
+						
 						break;
 
 					case 'editServer':
@@ -232,7 +236,8 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 							// Update server config
 							serverToEdit.name = message.server?.name || 'Unnamed Server';
 							serverToEdit.command = message.server?.command || '';
-							
+							serverToEdit.enabled = message.server.enabled || false;
+							serverToEdit.env = message.server.env || {};
 
 							console.log(`Server updated: ${serverToEdit.id} - ${serverToEdit.name}`);
 							
@@ -306,7 +311,7 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 
 	private async _registerTools(serverId: string, client: MCPClient, tools: Tool[]) {
 		// Unregister any existing tools for this server
-		await this._unregisterTools(serverId);
+		// await this._unregisterTools(serverId);
 
 		const registrations: vscode.Disposable[] = [];
 		const toolInstances: vscode.LanguageModelChatTool[] = [];
@@ -400,7 +405,7 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 				resources = (resourcesResponse.resources ?? []);
 				outputChannel.appendLine(`Retrieved ${resources.length} resources from server`);
 			} catch (error) {
-				outputChannel.appendLine(`Error retrieving resources: ${error instanceof Error ? error.message : 'Unknown error'}`);
+				console.log(`Error retrieving resources: ${error instanceof Error ? error.message : 'Unknown error'}`);
 			}
 
 
@@ -412,40 +417,11 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 			serverProcess.tools = tools;
 			serverProcess.resources = resources;
 			// Register tools with VS Code
-			await this._registerTools(serverId, client, tools);
+
 			await this._registerResources(serverId, client, resources);
 			// Set up tool list update handler
-			const updateToolList = async () => {
-				try {
-					const updatedToolsResponse = await client.listTools();
-					const updatedTools = (updatedToolsResponse.tools ?? []);
-					const serverProcess = this._processes.get(serverId);
-					if (serverProcess) {
-						serverProcess.tools = updatedTools;
-						
-						// Update tool registrations
-						await this._registerTools(serverId, client, updatedTools);
-
-						// Notify UI of updated tools
-						console.log(`Updating tool list for server ${serverId}`);
-						this._view?.webview.postMessage({
-							type: 'updateServerTools',
-							serverId,
-							tools: updatedTools.map((tool) => ({
-								name: tool.name,
-								description: tool.description,
-								inputSchema: tool.inputSchema
-							}))
-						});
-					}
-				} catch (error) {
-					console.error('Error handling tools changed event:', error);
-					outputChannel.appendLine(`Error updating tool list: ${error instanceof Error ? error.message : 'Unknown error'}`);
-				}
-			};
-
 			// Initial update to ensure UI has tools
-			await updateToolList();
+			await this._updateTools(serverId, tools);
 
 			// Set up notification handler to check for tool updates
 			// client.fallbackNotificationHandler = async (notification: Notification) => {
@@ -457,6 +433,29 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 		} catch (error) {
 			outputChannel.appendLine(`Failed to initialize MCP client: ${error instanceof Error ? error.message : 'Unknown error'}`);
 			throw error;
+		}
+	}
+
+	private async _updateTools(serverId: string, tools: Tool[]) {
+		const serverProcess = this._processes.get(serverId);
+		if (serverProcess) {
+			serverProcess.tools = tools;
+			const mcpClient = serverProcess.mcpClient;
+			if (mcpClient) {
+				// Update tool registrations
+				await this._registerTools(serverId, mcpClient, tools);
+
+			// Notify UI of updated tools
+			console.log(`Updating tool list for server ${serverId}`);
+			this._view?.webview.postMessage({
+				type: 'updateServerTools',
+				serverId,
+				tools: tools
+				});
+			}else {
+				console.log("MCP client not found for server:", serverId);
+			}
+
 		}
 	}
 
@@ -845,6 +844,8 @@ interface WebviewMessage {
 		id: string;
 		name: string;
 		command: string;
+		enabled: boolean;
+		env: { [key: string]: string };
 	};
 	id: string;
 	enabled: boolean;
