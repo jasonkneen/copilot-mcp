@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import '@/styles/globals.css';
-import { ServerConfig, ServerWithTools } from './types';
+import { ServerConfig, ServerWithTools, ServerType } from './types';
 import { ServerCard } from './components/ServerCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,15 @@ interface BaseModalProps {
 }
 
 interface AddServerModalProps extends BaseModalProps {
-    onSubmit: (name: string, command: string, env?: { [key: string]: string }) => void;
+    onSubmit: (server: {
+        name: string;
+        type: ServerType;
+        command?: string;
+        url?: string;
+        authToken?: string;
+        enabled?: boolean;
+        env?: { [key: string]: string };
+    }) => void;
 }
 
 type ServerModalProps = AddServerModalProps;
@@ -25,7 +33,10 @@ declare global {
 
 function ServerModal(props: ServerModalProps) {
     const [name, setName] = useState('');
+    const [serverType, setServerType] = useState<ServerType>(ServerType.PROCESS);
     const [command, setCommand] = useState('');
+    const [url, setUrl] = useState('');
+    const [authToken, setAuthToken] = useState('');
     const [envVars, setEnvVars] = useState<{ key: string; value: string }[]>([]);
     const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +44,10 @@ function ServerModal(props: ServerModalProps) {
     useEffect(() => {
         if (!props.isOpen) {
             setName('');
+            setServerType(ServerType.PROCESS);
             setCommand('');
+            setUrl('');
+            setAuthToken('');
             setEnvVars([]);
             setError(null);
         }
@@ -47,12 +61,18 @@ function ServerModal(props: ServerModalProps) {
             setError('Server name is required');
             return;
         }
-        if (!command.trim()) {
-            setError('Command is required');
+        
+        if (serverType === ServerType.PROCESS && !command.trim()) {
+            setError('Command is required for process servers');
+            return;
+        }
+        
+        if (serverType === ServerType.SSE && !url.trim()) {
+            setError('URL is required for SSE servers');
             return;
         }
 
-        // Convert envVars array to object
+        // Convert envVars array to object (only needed for PROCESS servers)
         const env = envVars.reduce((acc, { key, value }) => {
             if (key.trim()) {
                 acc[key.trim()] = value;
@@ -60,7 +80,21 @@ function ServerModal(props: ServerModalProps) {
             return acc;
         }, {} as { [key: string]: string });
 
-        props.onSubmit(name.trim(), command.trim(), env);
+        // Create the server object with appropriate fields based on type
+        const server = {
+            name: name.trim(),
+            type: serverType,
+            enabled: true,
+            ...(serverType === ServerType.PROCESS ? { 
+                command: command.trim(),
+                env 
+            } : { 
+                url: url.trim(),
+                ...(authToken ? { authToken } : {})
+            })
+        };
+
+        props.onSubmit(server);
         
         setError(null);
         props.onClose();
@@ -107,60 +141,121 @@ function ServerModal(props: ServerModalProps) {
                             className="w-full p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-2 focus:ring-[var(--vscode-focusBorder)]"
                         />
                     </div>
+                    
                     <div className="space-y-2">
-                        <label htmlFor="server-command" className="text-sm font-medium block">
-                            Start Command:
+                        <label className="text-sm font-medium block">
+                            Server Type:
                         </label>
-                        <input
-                            id="server-command"
-                            type="text"
-                            value={command}
-                            onChange={(e) => setCommand(e.target.value)}
-                            placeholder="Enter command to start the server"
-                            className="w-full p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-2 focus:ring-[var(--vscode-focusBorder)]"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                            <label className="text-sm font-medium">Environment Variables:</label>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={addEnvVar}
-                                className="text-sm hover:bg-[var(--vscode-button-hoverBackground)]"
-                            >
-                                Add Variable
-                            </Button>
+                        <div className="flex space-x-4">
+                            <label className="flex items-center space-x-2">
+                                <input
+                                    type="radio"
+                                    checked={serverType === ServerType.PROCESS}
+                                    onChange={() => setServerType(ServerType.PROCESS)}
+                                    className="accent-[var(--vscode-button-background)]"
+                                />
+                                <span className="text-sm">Process</span>
+                            </label>
+                            <label className="flex items-center space-x-2">
+                                <input
+                                    type="radio"
+                                    checked={serverType === ServerType.SSE}
+                                    onChange={() => setServerType(ServerType.SSE)}
+                                    className="accent-[var(--vscode-button-background)]"
+                                />
+                                <span className="text-sm">SSE</span>
+                            </label>
                         </div>
-                        <div className="space-y-2">
-                            {envVars.map((envVar, index) => (
-                                <div key={index} className="flex gap-2">
-                                    <Input
-                                        type="text"
-                                        value={envVar.key}
-                                        onChange={(e) => updateEnvVar(index, 'key', e.target.value)}
-                                        placeholder="KEY"
-                                        className="flex-1 p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-2 focus:ring-[var(--vscode-focusBorder)]"
-                                    />
-                                    <Input
-                                        type="text"
-                                        value={envVar.value}
-                                        onChange={(e) => updateEnvVar(index, 'value', e.target.value)}
-                                        placeholder="value"
-                                        className="flex-1 p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-2 focus:ring-[var(--vscode-focusBorder)]"
-                                    />
+                    </div>
+                    
+                    {serverType === ServerType.PROCESS ? (
+                        <>
+                            <div className="space-y-2">
+                                <label htmlFor="server-command" className="text-sm font-medium block">
+                                    Start Command:
+                                </label>
+                                <input
+                                    id="server-command"
+                                    type="text"
+                                    value={command}
+                                    onChange={(e) => setCommand(e.target.value)}
+                                    placeholder="Enter command to start the server"
+                                    className="w-full p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-2 focus:ring-[var(--vscode-focusBorder)]"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-sm font-medium">Environment Variables:</label>
                                     <Button
                                         type="button"
                                         variant="ghost"
-                                        onClick={() => removeEnvVar(index)}
-                                        className="hover:bg-[var(--vscode-errorForeground)]/10"
+                                        onClick={addEnvVar}
+                                        className="text-sm hover:bg-[var(--vscode-button-hoverBackground)]"
                                     >
-                                        ×
+                                        Add Variable
                                     </Button>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
+                                <div className="space-y-2">
+                                    {envVars.map((envVar, index) => (
+                                        <div key={index} className="flex gap-2">
+                                            <Input
+                                                type="text"
+                                                value={envVar.key}
+                                                onChange={(e) => updateEnvVar(index, 'key', e.target.value)}
+                                                placeholder="KEY"
+                                                className="flex-1 p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-2 focus:ring-[var(--vscode-focusBorder)]"
+                                            />
+                                            <Input
+                                                type="text"
+                                                value={envVar.value}
+                                                onChange={(e) => updateEnvVar(index, 'value', e.target.value)}
+                                                placeholder="value"
+                                                className="flex-1 p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-2 focus:ring-[var(--vscode-focusBorder)]"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                onClick={() => removeEnvVar(index)}
+                                                className="hover:bg-[var(--vscode-errorForeground)]/10"
+                                            >
+                                                ×
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="space-y-2">
+                                <label htmlFor="server-url" className="text-sm font-medium block">
+                                    Server URL:
+                                </label>
+                                <input
+                                    id="server-url"
+                                    type="text"
+                                    value={url}
+                                    onChange={(e) => setUrl(e.target.value)}
+                                    placeholder="Enter SSE server URL"
+                                    className="w-full p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-2 focus:ring-[var(--vscode-focusBorder)]"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label htmlFor="auth-token" className="text-sm font-medium block">
+                                    Authentication Token (optional):
+                                </label>
+                                <input
+                                    id="auth-token"
+                                    type="password"
+                                    value={authToken}
+                                    onChange={(e) => setAuthToken(e.target.value)}
+                                    placeholder="Enter authentication token if required"
+                                    className="w-full p-2 rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:ring-2 focus:ring-[var(--vscode-focusBorder)]"
+                                />
+                            </div>
+                        </>
+                    )}
+                    
                     <div className="flex justify-end space-x-2 mt-6">
                         <Button
                             type="button"
@@ -235,15 +330,18 @@ export function App() {
         }
     }, []);
 
-    const handleAddServer = (name: string, command: string, env?: { [key: string]: string }) => {
+    const handleAddServer = (server: {
+        name: string;
+        type: ServerType;
+        command?: string;
+        url?: string;
+        authToken?: string;
+        enabled?: boolean;
+        env?: { [key: string]: string };
+    }) => {
         window.vscodeApi.postMessage({
             type: 'addServer',
-            server: {
-                name,
-                command,
-                enabled: true,
-                env
-            }
+            server
         });
     };
 

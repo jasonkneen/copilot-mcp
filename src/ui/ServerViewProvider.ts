@@ -5,7 +5,7 @@ import { ErrorHandler } from '../utils/ErrorHandler';
 import { MCPClientWrapper } from '../mcp/MCPClientWrapper';
 import { Tool, Resource } from '@modelcontextprotocol/sdk/types';
 import { EventBus } from '../utils/EventBus';
-import { ServerConfig, ServerEventType } from '../server/ServerConfig';
+import { ServerConfig, ServerEventType, ServerType } from '../server/ServerConfig';
 
 /**
  * WebviewProvider for the MCP Server Manager UI
@@ -192,16 +192,26 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                     if (message.server) {
                         const newServer: Omit<ServerConfig, 'id'> = {
                             name: message.server.name,
-                            command: message.server.command,
+                            type: message.server.type || ServerType.PROCESS,
                             enabled: message.server.enabled ?? true,
                             env: message.server.env || {}
                         };
+                        
+                        // Add appropriate fields based on server type
+                        const serverType = newServer.type || ServerType.PROCESS;
+                        
+                        if (serverType === ServerType.PROCESS) {
+                            newServer.command = message.server.command;
+                        } else if (serverType === ServerType.SSE) {
+                            newServer.url = message.server.url;
+                            newServer.authToken = message.server.authToken;
+                        }
                         
                         await this.serverManager.addServer(newServer);
                         await this._sendInitialState();
                         
                         if (this._logger) {
-                            this._logger.log(`Added server: ${newServer.name}`);
+                            this._logger.log(`Added ${serverType} server: ${newServer.name}`);
                         }
                     }
                     break;
@@ -219,11 +229,25 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                 
                 case 'editServer':
                     if (message.server && message.server.id) {
-                        await this.serverManager.updateServer(message.server.id, {
+                        const server = this.serverManager.getServer(message.server.id);
+                        const updates: Partial<ServerConfig> = {
                             name: message.server.name,
-                            command: message.server.command,
-                            env: message.server.env
-                        });
+                            // Ensure type is always set - default to the existing type or PROCESS
+                            type: message.server.type || (server?.type || ServerType.PROCESS)
+                        };
+                        
+                        // Add appropriate fields based on server type
+                        const serverType = updates.type || ServerType.PROCESS;
+                        
+                        if (serverType === ServerType.PROCESS) {
+                            updates.command = message.server.command;
+                            updates.env = message.server.env;
+                        } else if (serverType === ServerType.SSE) {
+                            updates.url = message.server.url;
+                            updates.authToken = message.server.authToken;
+                        }
+                        
+                        await this.serverManager.updateServer(message.server.id, updates);
                         await this._sendInitialState();
                         
                         if (this._logger) {
