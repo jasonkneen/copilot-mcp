@@ -12,3 +12,11 @@ If you are unsure of something, ALWAYS ask the user for clarification.
 
 If you do not know the answer, ALWAYS say so instead of guessing.
 
+For UI components, use the shadcn/ui library.
+
+For icons, use the lucide-react library.
+
+For styling, use the vscode theme variables, but be creative and leverage tailwinds capabilities.
+
+Always update the changelog when you make changes, and create commits that are descriptive of the changes you made.
+
