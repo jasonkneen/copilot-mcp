@@ -405,7 +405,14 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 				resources = (resourcesResponse.resources ?? []);
 				outputChannel.appendLine(`Retrieved ${resources.length} resources from server`);
 			} catch (error) {
-				console.log(`Error retrieving resources: ${error instanceof Error ? error.message : 'Unknown error'}`);
+				// If method not found, log it as an informational message since some servers may not support resources
+				if (error instanceof Error && error.message.includes('Method not found')) {
+					outputChannel.appendLine('Note: This MCP server does not support resource listing');
+				} else {
+					outputChannel.appendLine(`Error retrieving resources: ${error instanceof Error ? error.message : 'Unknown error'}`);
+				}
+				// Continue with empty resources array
+				resources = [];
 			}
 
 
