@@ -31,6 +31,15 @@ All notable changes to the MCP Server Extension will be documented in this file.
   - Simplified chat request handling
   - Support for special commands
   - Enhanced resource listing
+- Created ServerViewProvider for the UI
+  - React-based server management interface
+  - Event-driven UI updates
+  - Simplified communication with extension
+- Refactored extension.ts to use new architecture
+  - Streamlined activation flow
+  - Clear component initialization
+  - Proper error handling
+  - Improved command registration
 - Fixed "Method not found" errors for MCP servers that don't support all methods
 
 - Initial release
