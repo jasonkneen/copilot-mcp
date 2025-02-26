@@ -4,6 +4,12 @@ All notable changes to the MCP Server Extension will be documented in this file.
 
 ## [Unreleased]
 
+### New Features
+
+- Added support for SSE (Server-Sent Events) server type
+- Added automatic server configuration migration for backwards compatibility
+- Added `MCP: Migrate Server Configurations to Latest Format` command to manually update older server configurations
+
 ### Refactoring
 
 - Created initial refactoring plan in `refactoring-plan.md`

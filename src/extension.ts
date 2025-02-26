@@ -1,13 +1,6 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import * as path from 'path';
-import * as crypto from 'crypto';
-import { ChildProcess, spawn } from 'child_process';
-import { Client as MCPClient } from "@modelcontextprotocol/sdk/client/index";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio";
-import { CallToolRequest, Resource, Tool } from "@modelcontextprotocol/sdk/types";
-import { sendChatParticipantRequest } from '@vscode/chat-extension-utils';
 
 // Import our refactored components
 import { Logger } from './utils/Logger';
@@ -35,6 +28,12 @@ export async function activate(context: vscode.ExtensionContext) {
 		// 1. Initialize the ServerManager for handling server lifecycle
 		const serverManager = new ServerManager(context);
 		await serverManager.loadServers();
+		
+		// 1.1 Migrate any server configurations that don't have a type field
+		const migratedCount = await serverManager.migrateServerConfigurations();
+		if (migratedCount > 0) {
+			logger.log(`Migrated ${migratedCount} server configurations to include explicit type information`);
+		}
 		
 		// 2. Initialize the ToolManager for managing tool registrations
 		const toolManager = new ToolManager(context);
@@ -64,7 +63,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		);
 		
 		// Register commands
-		registerCommands(context);
+		registerCommands(context, serverManager);
 		
 		// Start enabled servers
 		await serverManager.startEnabledServers();
@@ -81,9 +80,11 @@ export async function activate(context: vscode.ExtensionContext) {
 /**
  * Register extension commands
  * @param context Extension context
+ * @param serverManager The server manager instance
  */
 function registerCommands(
-	context: vscode.ExtensionContext
+	context: vscode.ExtensionContext,
+	serverManager: ServerManager
 ): void {
 	// Command to open the server manager UI
 	const openServerManagerCmd = vscode.commands.registerCommand(
@@ -111,7 +112,29 @@ function registerCommands(
 		}
 	);
 	
-	context.subscriptions.push(openServerManagerCmd, addServerCmd);
+	// Command to migrate server configurations
+	const migrateServersCmd = vscode.commands.registerCommand(
+		'copilot-mcp.migrateServerConfigurations',
+		async () => {
+			try {
+				// Use the serverManager passed from the parent scope
+				const migratedCount = await serverManager.migrateServerConfigurations();
+				if (migratedCount > 0) {
+					vscode.window.showInformationMessage(
+						`Successfully migrated ${migratedCount} server configurations to include explicit type information.`
+					);
+				} else {
+					vscode.window.showInformationMessage(
+						'No server configurations needed migration. All servers already have proper type information.'
+					);
+				}
+			} catch (error) {
+				ErrorHandler.handleError('Migrate Server Configurations', error);
+			}
+		}
+	);
+	
+	context.subscriptions.push(openServerManagerCmd, addServerCmd, migrateServersCmd);
 }
 
 /**

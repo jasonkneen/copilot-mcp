@@ -17,30 +17,30 @@
   "engines": {
     "vscode": "^1.97.0"
   },
-	"categories": [
-		"AI",
-		"Chat",
-		"Programming Languages",
-		"Education",
-		"Snippets",
-		"Testing"
-	],
-	"keywords": [
-		"chat-participant",
+  "categories": [
+    "AI",
+    "Chat",
+    "Programming Languages",
+    "Education",
+    "Snippets",
+    "Testing"
+  ],
+  "keywords": [
+    "chat-participant",
     "copilot",
     "copilot-mcp",
     "chat-participant-utils",
     "dev",
-		"mcp",
-		"openrouter",
-		"coding",
-		"agent",
-		"autonomous",
-		"chatgpt",
-		"sonnet",
-		"ai",
-		"llama"
-	],
+    "mcp",
+    "openrouter",
+    "coding",
+    "agent",
+    "autonomous",
+    "chatgpt",
+    "sonnet",
+    "ai",
+    "llama"
+  ],
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -87,6 +87,10 @@
       {
         "command": "copilot-mcp.openServerManager",
         "title": "Open MCP Server Manager"
+      },
+      {
+        "command": "copilot-mcp.migrateServerConfigurations",
+        "title": "MCP: Migrate Server Configurations to Latest Format"
       }
     ],
     "configuration": {
@@ -167,6 +171,7 @@
     "@modelcontextprotocol/sdk": "^1.5.0",
     "@radix-ui/react-collapsible": "^1.1.3",
     "@radix-ui/react-label": "^2.1.2",
+    "@radix-ui/react-separator": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.2",
     "@radix-ui/react-switch": "^1.1.3",
     "@tailwindcss/postcss": "^4.0.6",
