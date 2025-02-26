@@ -1,0 +1,97 @@
+#!/bin/bash
+
+# A pre-push hook to automatically bump the patch version in package.json
+
+# Set to true to enable version bumping
+ENABLE_VERSION_BUMP=true
+
+# Function to check if we're on a branch where we want to bump the version
+# You can customize this function to only bump versions on specific branches
+should_bump_version() {
+  # Get the current branch name
+  local current_branch=$(git symbolic-ref --short HEAD)
+  
+  # By default, only bump on main/master branch
+  # Modify this condition to match your workflow
+  if [[ "$current_branch" == "main" || "$current_branch" == "master" ]]; then
+    return 0  # true in bash
+  else
+    return 1  # false in bash
+  fi
+}
+
+# Function to bump the version
+bump_version() {
+  echo "Starting version bump process..."
+  
+  # Check if package.json exists
+  if [ ! -f "package.json" ]; then
+    echo "Error: package.json not found."
+    exit 1
+  fi
+  
+  # Get the current version from package.json
+  CURRENT_VERSION=$(node -e "console.log(require('./package.json').version)")
+  echo "Current version: $CURRENT_VERSION"
+  
+  # Split the version into major, minor, and patch
+  IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+  
+  # Increment the patch version
+  PATCH=$((PATCH + 1))
+  
+  # Form the new version string
+  NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+  echo "New version: $NEW_VERSION"
+  
+  # Update the version in package.json
+  # Using temporary file to avoid issues with different sed behaviors on different platforms
+  node -e "
+    const fs = require('fs');
+    const packageJson = require('./package.json');
+    packageJson.version = '$NEW_VERSION';
+    fs.writeFileSync('./package.json', JSON.stringify(packageJson, null, 2) + '\n');
+  "
+  
+  if [ $? -ne 0 ]; then
+    echo "Error: Failed to update version in package.json"
+    exit 1
+  fi
+  
+  # Stage the changes to package.json
+  git add package.json
+  
+  # Commit the changes
+  git commit -m "chore: bump version to $NEW_VERSION"
+  
+  if [ $? -ne 0 ]; then
+    echo "Error: Failed to commit version bump"
+    exit 1
+  fi
+  
+  echo "Successfully bumped version to $NEW_VERSION and committed the change."
+}
+
+# Main script execution
+main() {
+  # Skip version bump if disabled
+  if [ "$ENABLE_VERSION_BUMP" != "true" ]; then
+    echo "Version bumping is disabled. Skipping..."
+    exit 0
+  fi
+  
+  # Check if we should bump the version on this branch
+  if ! should_bump_version; then
+    echo "Not on a version-bumping branch. Skipping version bump."
+    exit 0
+  fi
+  
+  # Perform the version bump
+  bump_version
+  
+  # Exit with success status
+  exit 0
+}
+
+# Run the main function
+main 
