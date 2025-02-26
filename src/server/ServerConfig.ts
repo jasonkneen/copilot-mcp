@@ -4,6 +4,16 @@ import { Resource, Tool } from '@modelcontextprotocol/sdk/types';
 import { Client as MCPClient } from '@modelcontextprotocol/sdk/client/index';
 
 /**
+ * Server types supported by the extension
+ */
+export enum ServerType {
+    /** Command-line process server */
+    PROCESS = 'process',
+    /** Server-Sent Events (SSE) server */
+    SSE = 'sse'
+}
+
+/**
  * Represents the configuration for an MCP server
  */
 export interface ServerConfig {
@@ -11,12 +21,18 @@ export interface ServerConfig {
     id: string;
     /** Display name for the server */
     name: string;
-    /** Command to start the server */
-    command: string;
+    /** Type of server - process or SSE */
+    type: ServerType;
+    /** Command to start the server (for process servers) */
+    command?: string;
+    /** URL for SSE connection (for SSE servers) */
+    url?: string;
     /** Whether the server is enabled and should auto-start */
     enabled: boolean;
-    /** Environment variables to pass to the server process */
+    /** Environment variables to pass to the server process (for process servers) */
     env?: { [key: string]: string };
+    /** Authentication token for SSE servers */
+    authToken?: string;
 }
 
 /**
