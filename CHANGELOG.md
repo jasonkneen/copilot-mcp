@@ -9,6 +9,13 @@ All notable changes to the MCP Server Extension will be documented in this file.
 - Added support for SSE (Server-Sent Events) server type
 - Added automatic server configuration migration for backwards compatibility
 - Added `MCP: Migrate Server Configurations to Latest Format` command to manually update older server configurations
+- Enhanced UI to support different server types:
+  - Added server type selection in add/edit server interfaces
+  - Added type-specific form fields (command for Process, URL/auth for SSE)
+  - Added server type badges for easy identification
+- Added new UI components from shadcn/ui library:
+  - Badge component for displaying server types
+  - Separator component for UI organization
 
 ### Refactoring
 
