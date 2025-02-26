@@ -11,7 +11,7 @@ import { ServerConfig, ServerEventType } from '../server/ServerConfig';
  * WebviewProvider for the MCP Server Manager UI
  */
 export class ServerViewProvider implements vscode.WebviewViewProvider {
-    public static readonly viewType = 'copilot-mcp.serverView';
+    public static readonly viewType = 'mcpServerManager';
     private _view?: vscode.WebviewView;
     private _logger?: Logger;
 
