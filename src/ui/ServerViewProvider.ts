@@ -13,7 +13,6 @@ import { ServerConfig, ServerEventType } from '../server/ServerConfig';
 export class ServerViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'copilot-mcp.serverView';
     private _view?: vscode.WebviewView;
-    private _webviewHtml: string = '';
     private _logger?: Logger;
 
     /**
