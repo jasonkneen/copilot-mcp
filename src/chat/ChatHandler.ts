@@ -1,24 +1,37 @@
 import * as vscode from 'vscode';
 import { sendChatParticipantRequest } from '@vscode/chat-extension-utils';
 import { Resource } from "@modelcontextprotocol/sdk/types";
+import { ToolManager } from '../managers/ToolManager';
+import { ResourceManager } from '../managers/ResourceManager';
 
 /**
  * Handles chat functionality for MCP integration
  */
 export class ChatHandler {
+  private _participant?: vscode.ChatParticipant;
+
   /**
-   * Static handler for chat requests from the MCP server view provider
-   * @param resources Available resources to display
-   * @param tools Available tools for the chat
+   * Creates a new chat handler
+   * @param toolManager The tool manager instance
+   * @param resourceManager The resource manager instance
+   */
+  constructor(
+    private readonly toolManager: ToolManager,
+    private readonly resourceManager: ResourceManager,
+    private readonly context: vscode.ExtensionContext
+  ) {
+    console.log('ChatHandler initialized');
+  }
+
+  /**
+   * Handle chat requests
    * @param request The chat request
    * @param context The chat context
    * @param stream The response stream
    * @param token The cancellation token
    * @returns The chat result
    */
-  public static async handleChatRequest(
-    resources: Resource[],
-    tools: vscode.LanguageModelChatTool[],
+  public async handleRequest(
     request: vscode.ChatRequest,
     context: vscode.ChatContext,
     stream: vscode.ChatResponseStream,
@@ -29,9 +42,11 @@ export class ChatHandler {
 
       // Handle special commands
       if (request.command === 'listResources') {
-        return ChatHandler.handleListResourcesCommand(resources, stream);
+        return this._handleListResourcesCommand(stream);
       }
       
+      // Get all available tools from the tool manager
+      const tools = this.toolManager.getAllTools();
       console.log("Available tools:", tools.length);
       
       // Forward the request to VS Code's chat system with our tools
@@ -59,13 +74,14 @@ export class ChatHandler {
 
   /**
    * Handle the listResources command
-   * @param resources The resources to list
    * @param stream The response stream
    */
-  private static async handleListResourcesCommand(
-    resources: Resource[],
+  private async _handleListResourcesCommand(
     stream: vscode.ChatResponseStream
   ): Promise<vscode.ChatResult> {
+    // Get resources from the resource manager
+    const resources = this.resourceManager.getAllResources();
+    
     if (resources.length === 0) {
       stream.push(new vscode.ChatResponseMarkdownPart(
         new vscode.MarkdownString("No resources found")
@@ -105,5 +121,54 @@ export class ChatHandler {
         command: 'readResource'
       }
     };
+  }
+
+  /**
+   * Register the chat participant
+   * @returns The chat participant disposable
+   */
+  public register(): vscode.Disposable {
+    // Create the chat participant
+    const participant = vscode.chat.createChatParticipant(
+      'copilot-mcp.mcp', 
+      (request, context, stream, token) => this.handleRequest(request, context, stream, token)
+    );
+    
+    // Add followup provider
+    participant.followupProvider = {
+      provideFollowups: (result, context, token) => {
+        if (result.metadata?.command === 'readResource') {
+          return [
+            {
+              label: 'Read Resource',
+              command: 'copilot-mcp.readResource',
+              prompt: 'Read the resource'
+            }
+          ];
+        }
+        return [];
+      }
+    };
+    
+    // Store the participant reference
+    this._participant = participant;
+    
+    return participant;
+  }
+
+  /**
+   * Static factory method to create and register a chat handler
+   * @param context The extension context
+   * @param toolManager The tool manager
+   * @param resourceManager The resource manager
+   * @returns The chat participant disposable
+   */
+  public static register(
+    context: vscode.ExtensionContext,
+    toolManager: ToolManager,
+    resourceManager: ResourceManager
+  ): vscode.Disposable {
+    const handler = new ChatHandler(toolManager, resourceManager, context);
+    return handler.register();
   }
 }

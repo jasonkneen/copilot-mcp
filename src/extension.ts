@@ -34,8 +34,14 @@ export function activate(context: vscode.ExtensionContext) {
 	console.log('Starting activation of copilot-mcp extension...');
 	
 	try {
+		// Initialize the ToolManager for managing tool registrations
+		const toolManager = new ToolManager(context);
+		
+		// Initialize the ResourceManager for managing resources
+		const resourceManager = new ResourceManager(context);
+		
 		console.log('Registering MCPServerViewProvider...');
-		const provider = new MCPServerViewProvider(context.extensionUri, context);
+		const provider = new MCPServerViewProvider(context.extensionUri, context, toolManager, resourceManager);
 		
 		// Log the extension's root path to verify resource locations
 		console.log('Extension URI:', context.extensionUri.fsPath);
@@ -59,23 +65,17 @@ export function activate(context: vscode.ExtensionContext) {
 		});
 		context.subscriptions.push(cmdDisposable);
 
-		// Store provider reference for cleanup
-		context.subscriptions.push({ dispose: () => provider.dispose() });
-		const copilotMCP = vscode.chat.createChatParticipant('copilot-mcp.mcp', provider.chatHandler);
-		copilotMCP.followupProvider = {
-			provideFollowups(result, context, token) {
-				console.log("Followup request:", result);
-				if (result.metadata?.command === 'readResource') {
-					return [
-						{
-							label: 'Read Resource',
-							command: 'copilot-mcp.readResource',
-							prompt: 'Read the resource'
-						}
-					];
-				}
-			},
-		};
+		// Register the ChatHandler for chat integration
+		const chatParticipant = ChatHandler.register(context, toolManager, resourceManager);
+		
+		// Add disposables to context
+		context.subscriptions.push(
+			{ dispose: () => provider.dispose() },
+			{ dispose: () => toolManager.dispose() },
+			{ dispose: () => resourceManager.dispose() },
+			chatParticipant
+		);
+		
 		console.log('copilot-mcp extension activated successfully');
 	} catch (error) {
 		console.error('Error during extension activation:', error);
@@ -95,16 +95,13 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 	private _view?: vscode.WebviewView;
 	private _servers: ServerConfig[] = [];
 	private _processes: Map<string, ServerProcess> = new Map();
-	private _toolManager: ToolManager;
-	private _resourceManager: ResourceManager;
 
 	constructor(
 		private readonly _extensionUri: vscode.Uri,
-		private readonly _context: vscode.ExtensionContext
+		private readonly _context: vscode.ExtensionContext,
+		private readonly _toolManager: ToolManager = new ToolManager(_context),
+		private readonly _resourceManager: ResourceManager = new ResourceManager(_context)
 	) {
-		// Initialize managers
-		this._toolManager = new ToolManager(this._context);
-		this._resourceManager = new ResourceManager(this._context);
 		
 		// Load initial server configurations and start enabled servers
 		this._loadServers().then(() => {
@@ -159,28 +156,7 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 		this._context.subscriptions.push(cmdDisposable);
 	}
 
-	public chatHandler: vscode.ChatRequestHandler = async (
-		request: vscode.ChatRequest,
-		context: vscode.ChatContext,
-		stream: vscode.ChatResponseStream,
-		token: vscode.CancellationToken
-	): Promise<any> => {
-		// Get resources from the ResourceManager
-		const resources = this._resourceManager.getAllResources();
-		
-		// Get tools from the ToolManager
-		const tools = this._toolManager.getAllTools();
-		
-		// Use the ChatHandler to handle the request
-		return ChatHandler.handleChatRequest(
-			resources,
-			tools,
-			request,
-			context,
-			stream,
-			token
-		);
-	};
+	// Chat handling is now entirely managed by the ChatHandler class
 
 	public resolveWebviewView(
 		webviewView: vscode.WebviewView,
