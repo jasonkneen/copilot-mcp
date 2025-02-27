@@ -1,7 +1,6 @@
 import { Client as MCPClient } from '@modelcontextprotocol/sdk/client/index';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse';
-import { Transport } from '@modelcontextprotocol/sdk/client/transport';
 import { Resource, Tool } from '@modelcontextprotocol/sdk/types';
 import { ServerType } from '../server/ServerConfig';
 import { ChildProcess } from 'child_process';
@@ -11,7 +10,7 @@ import { ChildProcess } from 'child_process';
  */
 export class MCPClientWrapper {
     private _client: MCPClient;
-    private _transport: Transport;
+    private _transport: StdioClientTransport | SSEClientTransport;
     private _serverType: ServerType;
     private _tools: Tool[] = [];
     private _resources: Resource[] = [];

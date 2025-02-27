@@ -118,6 +118,13 @@ export function deactivate() {
     }
 }
 
+// Import the ServerConfig and ServerProcess types
+import { ServerConfig, ServerProcess } from './server/ServerConfig';
+import { ChildProcess, spawn } from 'child_process';
+import { Resource, Tool } from '@modelcontextprotocol/sdk/types';
+import { Client as MCPClient } from '@modelcontextprotocol/sdk/client/index';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
+
 class MCPServerViewProvider implements vscode.WebviewViewProvider {
 	public static readonly viewType = 'mcpServerManager';
 	private _view?: vscode.WebviewView;
