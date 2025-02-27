@@ -1,93 +1,121 @@
 // The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as crypto from 'crypto';
-import { ChildProcess, spawn } from 'child_process';
-import { Client as MCPClient } from "@modelcontextprotocol/sdk/client/index";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio";
-import { CallToolRequest, Resource, Tool } from "@modelcontextprotocol/sdk/types";
-import { ChatHandler } from './chat/ChatHandler';
+
+// Import our architectural components
+import { ServerManager } from './server/ServerManager';
 import { ToolManager } from './managers/ToolManager';
 import { ResourceManager } from './managers/ResourceManager';
-
-
-interface ServerConfig {
-	id: string;
-	name: string;
-	command: string;
-	enabled: boolean;
-	env?: { [key: string]: string };
-}
-
-interface ServerProcess {
-	process: ChildProcess;
-	outputChannel: vscode.OutputChannel;
-	mcpClient?: MCPClient;
-	tools: Tool[];
-	resources: Resource[];
-}
+import { ChatHandler } from './chat/ChatHandler';
+import { Logger, LogLevel } from './utils/Logger';
+import { ErrorHandler } from './utils/ErrorHandler';
+import { EventBus } from './utils/EventBus';
 
 // This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
-	console.log('Starting activation of copilot-mcp extension...');
-	
-	try {
-		// Initialize the ToolManager for managing tool registrations
-		const toolManager = new ToolManager(context);
-		
-		// Initialize the ResourceManager for managing resources
-		const resourceManager = new ResourceManager(context);
-		
-		console.log('Registering MCPServerViewProvider...');
-		const provider = new MCPServerViewProvider(context.extensionUri, context, toolManager, resourceManager);
-		
-		// Log the extension's root path to verify resource locations
-		console.log('Extension URI:', context.extensionUri.fsPath);
-		console.log('Expected icon path:', path.join(context.extensionUri.fsPath, 'media', 'server.svg'));
-
-		const viewDisposable = vscode.window.registerWebviewViewProvider(
-			MCPServerViewProvider.viewType,
-			provider
-		);
-		console.log('WebviewViewProvider registered successfully');
-		context.subscriptions.push(viewDisposable);
-
-		const cmdDisposable = vscode.commands.registerCommand('copilot-mcp.openServerManager', async () => {
-			console.log('Executing openServerManager command...');
-			try {
-				await vscode.commands.executeCommand('workbench.view.extension.mcpServers');
-				console.log('View opened successfully');
-			} catch (error: unknown) {
-				console.error('Error opening view:', error);
-			}
-		});
-		context.subscriptions.push(cmdDisposable);
-
-		// Register the ChatHandler for chat integration
-		const chatParticipant = ChatHandler.register(context, toolManager, resourceManager);
-		
-		// Add disposables to context
-		context.subscriptions.push(
-			{ dispose: () => provider.dispose() },
-			{ dispose: () => toolManager.dispose() },
-			{ dispose: () => resourceManager.dispose() },
-			chatParticipant
-		);
-		
-		console.log('copilot-mcp extension activated successfully');
-	} catch (error) {
-		console.error('Error during extension activation:', error);
-		throw error;
-	}
+export async function activate(context: vscode.ExtensionContext) {
+    console.log('Starting activation of copilot-mcp extension...');
+    
+    try {
+        // Initialize the logger for the extension
+        const logger = Logger.initialize(context, 'MCP Server Manager', LogLevel.Info);
+        logger.log('Initializing extension...');
+        
+        // Initialize the tool manager
+        const toolManager = new ToolManager(context);
+        logger.log('ToolManager initialized');
+        
+        // Initialize the resource manager
+        const resourceManager = new ResourceManager(context);
+        logger.log('ResourceManager initialized');
+        
+        // Initialize the server manager
+        const serverManager = new ServerManager(context, toolManager, resourceManager);
+        logger.log('ServerManager initialized');
+        
+        // Load servers from configuration
+        await serverManager.loadServers();
+        logger.log('Servers loaded from configuration');
+        
+        // Register the WebView Provider
+        const viewType = 'mcpServerManager';
+        const viewProvider = new MCPServerViewProvider(context.extensionUri, context, toolManager, resourceManager);
+        
+        const viewDisposable = vscode.window.registerWebviewViewProvider(
+            viewType, 
+            viewProvider
+        );
+        context.subscriptions.push(viewDisposable);
+        logger.log('WebView provider registered');
+        
+        // Register the openServerManager command
+        const openManagerCommand = vscode.commands.registerCommand('copilot-mcp.openServerManager', async () => {
+            try {
+                await vscode.commands.executeCommand('workbench.view.extension.mcpServers');
+            } catch (error) {
+                ErrorHandler.handleError('Open Server Manager', error);
+            }
+        });
+        context.subscriptions.push(openManagerCommand);
+        
+        // Register the migrateServerConfigurations command
+        const migrateCommand = vscode.commands.registerCommand('copilot-mcp.migrateServerConfigurations', async () => {
+            try {
+                const migratedCount = await serverManager.migrateServerConfigurations();
+                if (migratedCount > 0) {
+                    vscode.window.showInformationMessage(
+                        `Successfully migrated ${migratedCount} server configurations to include explicit type information.`
+                    );
+                } else {
+                    vscode.window.showInformationMessage(
+                        'No server configurations needed migration. All servers already have proper type information.'
+                    );
+                }
+            } catch (error) {
+                ErrorHandler.handleError('Migrate Server Configurations', error);
+            }
+        });
+        context.subscriptions.push(migrateCommand);
+        
+        // Register the ChatHandler
+        const chatParticipant = ChatHandler.register(context, toolManager, resourceManager);
+        
+        // Add disposables to extension context
+        context.subscriptions.push(
+            // Core components
+            { dispose: () => serverManager.dispose() },
+            { dispose: () => toolManager.dispose() },
+            { dispose: () => resourceManager.dispose() },
+            { dispose: () => viewProvider.dispose() },
+            // Chat participant
+            chatParticipant
+        );
+        
+        // Start all enabled servers
+        await serverManager.startEnabledServers();
+        
+        logger.log('Extension activation complete');
+        console.log('copilot-mcp extension activated successfully');
+    } catch (error) {
+        ErrorHandler.handleError('Extension Activation', error);
+        console.error('Error during extension activation:', error);
+        vscode.window.showErrorMessage(`Failed to activate the extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 }
 
 
 
 // This method is called when your extension is deactivated
 export function deactivate() {
-	// The dispose method of the provider will be called through the subscription
+    try {
+        console.log('Deactivating MCP extension...');
+        
+        // The components will be disposed through the context subscriptions
+        // Nothing extra to do here for now
+        
+        console.log('MCP extension deactivated successfully');
+    } catch (error) {
+        console.error('Error during extension deactivation:', error);
+    }
 }
 
 class MCPServerViewProvider implements vscode.WebviewViewProvider {
