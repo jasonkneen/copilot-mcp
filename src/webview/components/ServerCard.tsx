@@ -82,8 +82,8 @@ export const ServerCard = ({ className, server }: ServerCardProps) => {
     };
 
     const handleSave = () => {
-        if (editName.trim() && editCommand.trim()) {
-            handleEditServer(editName.trim(), editCommand.trim(), editEnvVars);
+        if (editName.trim() && (editCommand?.trim() || '')) {
+            handleEditServer(editName.trim(), editCommand?.trim() || '', editEnvVars);
         }
     };
 

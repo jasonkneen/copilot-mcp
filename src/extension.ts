@@ -10,6 +10,7 @@ import { ChatHandler } from './chat/ChatHandler';
 import { Logger, LogLevel } from './utils/Logger';
 import { ErrorHandler } from './utils/ErrorHandler';
 import { EventBus } from './utils/EventBus';
+import { ServerViewProvider } from './ui/ServerViewProvider';
 
 // This method is called when your extension is activated
 export async function activate(context: vscode.ExtensionContext) {
@@ -36,15 +37,8 @@ export async function activate(context: vscode.ExtensionContext) {
         await serverManager.loadServers();
         logger.log('Servers loaded from configuration');
         
-        // Register the WebView Provider
-        const viewType = 'mcpServerManager';
-        const viewProvider = new MCPServerViewProvider(context.extensionUri, context, toolManager, resourceManager);
-        
-        const viewDisposable = vscode.window.registerWebviewViewProvider(
-            viewType, 
-            viewProvider
-        );
-        context.subscriptions.push(viewDisposable);
+        // Register the WebView Provider using our ServerViewProvider class
+        const serverViewProvider = await ServerViewProvider.createOrShow(context, serverManager);
         logger.log('WebView provider registered');
         
         // Register the openServerManager command
@@ -85,7 +79,7 @@ export async function activate(context: vscode.ExtensionContext) {
             { dispose: () => serverManager.dispose() },
             { dispose: () => toolManager.dispose() },
             { dispose: () => resourceManager.dispose() },
-            { dispose: () => viewProvider.dispose() },
+            { dispose: () => serverViewProvider.dispose() },
             // Chat participant
             chatParticipant
         );

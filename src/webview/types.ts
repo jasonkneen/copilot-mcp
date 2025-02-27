@@ -1,7 +1,15 @@
+export enum ServerType {
+    PROCESS = 'process',
+    SSE = 'sse'
+}
+
 export interface ServerConfig {
     id: string;
     name: string;
-    command: string;
+    type?: ServerType;
+    command?: string;
+    url?: string;
+    authToken?: string;
     enabled: boolean;
     env?: { [key: string]: string };
 }
@@ -12,8 +20,15 @@ export interface Tool {
     inputSchema: any;
 }
 
+export interface Resource {
+    name: string;
+    type: string;
+    settings: any;
+}
+
 export interface ServerWithTools extends ServerConfig {
     tools: Tool[];
+    resources?: Resource[];
 }
 
 export interface EnvVar {

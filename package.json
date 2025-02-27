@@ -87,6 +87,10 @@
       {
         "command": "copilot-mcp.openServerManager",
         "title": "Open MCP Server Manager"
+      },
+      {
+        "command": "copilot-mcp.migrateServerConfigurations",
+        "title": "Migrate MCP Server Configurations"
       }
     ],
     "configuration": {
@@ -101,7 +105,6 @@
             "required": [
               "id",
               "name",
-              "command",
               "enabled"
             ],
             "properties": {
@@ -113,13 +116,34 @@
                 "type": "string",
                 "description": "Display name for the server"
               },
+              "type": {
+                "type": "string",
+                "enum": ["process", "sse"],
+                "default": "process",
+                "description": "Type of MCP server: process (local command) or SSE (remote server)"
+              },
               "command": {
                 "type": "string",
-                "description": "Command to start the server"
+                "description": "Command to start the server (for process servers)"
+              },
+              "url": {
+                "type": "string",
+                "description": "URL for SSE server connection (for SSE servers)"
+              },
+              "authToken": {
+                "type": "string",
+                "description": "Authentication token for SSE server (for SSE servers)"
               },
               "enabled": {
                 "type": "boolean",
                 "description": "Whether the server is enabled"
+              },
+              "env": {
+                "type": "object",
+                "description": "Environment variables for the server process (for process servers)",
+                "additionalProperties": {
+                  "type": "string"
+                }
               }
             }
           }
