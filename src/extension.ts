@@ -8,6 +8,8 @@ import { Client as MCPClient } from "@modelcontextprotocol/sdk/client/index";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio";
 import { CallToolRequest, Resource, Tool } from "@modelcontextprotocol/sdk/types";
 import { ChatHandler } from './chat/ChatHandler';
+import { ToolManager } from './managers/ToolManager';
+import { ResourceManager } from './managers/ResourceManager';
 
 
 interface ServerConfig {
@@ -93,15 +95,17 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 	private _view?: vscode.WebviewView;
 	private _servers: ServerConfig[] = [];
 	private _processes: Map<string, ServerProcess> = new Map();
-	private _toolRegistrations: Map<string, vscode.Disposable[]> = new Map();
-	private _toolInstances: vscode.LanguageModelChatTool[] = [];
-	private _resourceRegistrations: Map<string, vscode.Disposable[]> = new Map();
-	private _resourceInstances: Resource[] = [];
+	private _toolManager: ToolManager;
+	private _resourceManager: ResourceManager;
 
 	constructor(
 		private readonly _extensionUri: vscode.Uri,
 		private readonly _context: vscode.ExtensionContext
 	) {
+		// Initialize managers
+		this._toolManager = new ToolManager(this._context);
+		this._resourceManager = new ResourceManager(this._context);
+		
 		// Load initial server configurations and start enabled servers
 		this._loadServers().then(() => {
 			// Start all enabled servers
@@ -112,29 +116,47 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 					vscode.window.showErrorMessage(`Failed to auto-start server "${server.name}": ${error instanceof Error ? error.message : 'Unknown error'}`);
 				}));
 		});
+		
+		// Register resource read command
 		const readResourceHandler = async (uri: string) => {
-			const resource = this._resourceInstances.find(r => r.uri === uri);
+			// Use the resource manager to get the resources
+			const resources = this._resourceManager.getAllResources();
+			const resource = resources.find(r => r.uri === uri);
+			
 			if (resource) {
-				// read the resource
-				const resourceContent = Array.from(this._processes.values()).flatMap(async process =>  await process.mcpClient?.readResource({ uri: resource.uri }));
-				for (const item of resourceContent) {
-					const resolvedItem = await item;
-					resolvedItem?.contents.forEach(content => {
-						if (typeof content.text === 'string') {
+				// Find the server process that has the resource
+				for (const [serverId, process] of this._processes.entries()) {
+					if (process.mcpClient) {
+						try {
+							const resourceContent = await process.mcpClient.readResource({ uri: resource.uri });
+							console.log('Resource content:', resourceContent);
 							
-							return content.text;
-						} else {
-							return 'Unsupported resource type';
+							// Handle the resource content
+							if (resourceContent.contents && resourceContent.contents.length > 0) {
+								const content = resourceContent.contents[0];
+								if (typeof content.text === 'string') {
+									return content.text;
+								}
+							}
+						} catch (error) {
+							console.error(`Error reading resource from server ${serverId}:`, error);
 						}
-					});
+					}
 				}
+				return 'Could not read resource content';
 			} else {
 				return 'Resource not found';
 			}
 			
 			return 'Click one of the buttons to read the resource';
 		};
-		vscode.commands.registerCommand(`copilot-mcp.readResource`, readResourceHandler);
+		
+		// Register the command
+		const cmdDisposable = vscode.commands.registerCommand(
+			`copilot-mcp.readResource`, 
+			readResourceHandler
+		);
+		this._context.subscriptions.push(cmdDisposable);
 	}
 
 	public chatHandler: vscode.ChatRequestHandler = async (
@@ -143,11 +165,11 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 		stream: vscode.ChatResponseStream,
 		token: vscode.CancellationToken
 	): Promise<any> => {
-		// Get all resources from running servers
-		const resources = Array.from(this._processes.values()).flatMap(process => process.resources);
+		// Get resources from the ResourceManager
+		const resources = this._resourceManager.getAllResources();
 		
-		// Get all tools
-		const tools = this.getAllTools();
+		// Get tools from the ToolManager
+		const tools = this._toolManager.getAllTools();
 		
 		// Use the ChatHandler to handle the request
 		return ChatHandler.handleChatRequest(
@@ -257,95 +279,7 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 		});
 	}
 
-	private async _registerResources(serverId: string, client: MCPClient, resources: Resource[]) {
-		const registrations: vscode.Disposable[] = [];
-
-		for (const resource of resources) {
-			try {
-				const command = `copilot-mcp.${resource.name}`;
-
-				const commandHandler = async (uri: string) => {
-					const resource = this._processes.get(serverId)?.resources.find(r => r.uri === uri);
-					if (resource) {
-						console.log('Resource:', resource);
-						const resourceContent = await client.readResource({ uri: resource.uri });
-						console.log('Resource content:', resourceContent);
-						this._resourceInstances.push(resource);
-					}
-				};
-				console.log('Registering resource:', resource.name);
-				const registration = vscode.commands.registerCommand(command, commandHandler);
-				registrations.push(registration);
-			} catch (error) {
-				console.error(`Failed to register resource:`, resource.name, error);
-			}
-		}
-		this._resourceRegistrations.set(serverId, registrations);
-	}
-
-	private async _registerTools(serverId: string, client: MCPClient, tools: Tool[]) {
-		// Unregister any existing tools for this server
-		// await this._unregisterTools(serverId);
-
-		const registrations: vscode.Disposable[] = [];
-		const toolInstances: vscode.LanguageModelChatTool[] = [];
-
-		// Create a Set of existing tool names to prevent duplicates
-		const existingToolNames = new Set(this._toolInstances.map(tool => tool.name));
-
-		for (const tool of tools) {
-			try {
-				console.log('Registering tool:', tool.name); // Debug log
-				if (!tool.name) {
-					console.warn('Tool missing name:', tool);
-					continue;
-				}
-
-				// Skip if tool is already registered
-				if (existingToolNames.has(tool.name)) {
-					console.log(`Tool ${tool.name} already registered, skipping`);
-					continue;
-				}
-
-				// Create unique tool ID by combining serverId and tool name
-				const toolName = tool.name;
-				const chatTool = new McpProxyTool(client, tool);
-				
-				const registration = vscode.lm.registerTool(toolName, chatTool);
-				registrations.push(registration);
-				toolInstances.push(chatTool);
-				existingToolNames.add(toolName);
-				
-				console.log(`Registered tool: ${toolName}`);
-			} catch (error) {
-				console.error(`Failed to register tool:`, tool.name, error);
-			}
-		}
-
-		if (registrations.length > 0) {
-			this._toolRegistrations.set(serverId, registrations);
-			// Filter out any existing tools with the same names before adding new ones
-			this._toolInstances = [
-				...this._toolInstances.filter(t => !toolInstances.some(newTool => newTool.name === t.name)),
-				...toolInstances
-			];
-			// Add to extension subscriptions for cleanup
-			this._context.subscriptions.push(...registrations);
-		}
-	}
-
-	private async _unregisterTools(serverId: string) {
-		const registrations = this._toolRegistrations.get(serverId);
-		if (registrations) {
-			registrations.forEach(registration => registration.dispose());
-			this._toolRegistrations.delete(serverId);
-			
-			// Remove the unregistered tools from _toolInstances
-			const serverTools = this._processes.get(serverId)?.tools || [];
-			const toolNamesToRemove = new Set(serverTools.map(t => t.name));
-			this._toolInstances = this._toolInstances.filter(t => !toolNamesToRemove.has(t.name));
-		}
-	}
+	// These methods are now handled by the ResourceManager and ToolManager classes
 
 	private async _connectMCPClient(serverId: string, process: ChildProcess, outputChannel: vscode.OutputChannel): Promise<void> {
 		try {
@@ -382,7 +316,6 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 				console.log(`Error retrieving resources: ${error instanceof Error ? error.message : 'Unknown error'}`);
 			}
 
-
 			// Store client and tools
 			const serverProcess = this._processes.get(serverId);
 			if (!serverProcess) {return;}
@@ -390,48 +323,48 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 			serverProcess.mcpClient = client;
 			serverProcess.tools = tools;
 			serverProcess.resources = resources;
-			// Register tools with VS Code
-
-			await this._registerResources(serverId, client, resources);
-			// Set up tool list update handler
-			// Initial update to ensure UI has tools
-			await this._updateTools(serverId, tools);
-
-			// Set up notification handler to check for tool updates
-			// client.fallbackNotificationHandler = async (notification: Notification) => {
-			// 	if (notification.method === 'notifications/tools/list_changed') {
-			// 		await updateToolList();
-			// 	}
-			// };
+			
+			// Register tools and resources using the managers
+			await this._resourceManager.registerResources(serverId, client, resources);
+			await this._toolManager.registerTools(serverId, client, tools);
+			
+			// Notify UI of updated tools
+			this._updateWebviewWithToolsAndResources(serverId, tools, resources);
 
 		} catch (error) {
 			outputChannel.appendLine(`Failed to initialize MCP client: ${error instanceof Error ? error.message : 'Unknown error'}`);
 			throw error;
 		}
 	}
-
-	private async _updateTools(serverId: string, tools: Tool[]) {
-		const serverProcess = this._processes.get(serverId);
-		if (serverProcess) {
-			serverProcess.tools = tools;
-			const mcpClient = serverProcess.mcpClient;
-			if (mcpClient) {
-				// Update tool registrations
-				await this._registerTools(serverId, mcpClient, tools);
-
-			// Notify UI of updated tools
-			console.log(`Updating tool list for server ${serverId}`);
-			this._view?.webview.postMessage({
-				type: 'updateServerTools',
-				serverId,
-				tools: tools
-				});
-			}else {
-				console.log("MCP client not found for server:", serverId);
-			}
-
+	
+	/**
+	 * Update the webview with tools and resources for a server
+	 * @param serverId The server ID 
+	 * @param tools The tools to display
+	 * @param resources The resources to display
+	 */
+	private _updateWebviewWithToolsAndResources(serverId: string, tools: Tool[], resources: Resource[]) {
+		if (!this._view) {
+			return;
 		}
+		
+		// Find the server
+		const server = this._servers.find(s => s.id === serverId);
+		if (!server) {
+			return;
+		}
+		
+		// Update the webview
+		this._view.webview.postMessage({
+			type: 'updateServerTools',
+			serverId,
+			tools
+		});
+		
+		console.log(`Updated webview with ${tools.length} tools for server ${serverId}`);
 	}
+
+	// This method has been replaced by _updateWebviewWithToolsAndResources
 
 	private async _startServer(server: ServerConfig): Promise<void> {
 		try {
@@ -522,8 +455,9 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 		}
 
 		try {
-			// Unregister tools first
-			await this._unregisterTools(serverId);
+			// Unregister tools and resources using the managers
+			this._toolManager.unregisterTools(serverId);
+			this._resourceManager.unregisterResources(serverId);
 
 			const { process, outputChannel, mcpClient } = serverProcess;
 			
@@ -691,10 +625,9 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	public async dispose() {
-		// Unregister all tools before stopping servers
-		for (const serverId of this._toolRegistrations.keys()) {
-			await this._unregisterTools(serverId);
-		}
+		// Dispose our managers
+		this._toolManager.dispose();
+		this._resourceManager.dispose();
 
 		// Stop all running servers
 		for (const [serverId, { process, outputChannel }] of this._processes.entries()) {
@@ -708,101 +641,9 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 		}
 		this._processes.clear();
 	}
-
-	public getAllTools(): vscode.LanguageModelChatTool[] {
-		// Return a clean version of the tools without circular references
-		return this._toolInstances.map(tool => {
-			// Create a new proxy that forwards all calls to the original tool
-			// but doesn't expose internal properties
-			return new Proxy(tool, {
-				get(target, prop) {
-					return target[prop as keyof typeof target];
-				}
-			});
-		});
-	}
-
-	public getAllResources(): Resource[] {
-		return this._resourceInstances;
-	}
 }
 
-class McpProxyTool implements vscode.LanguageModelChatTool {
-	private _client: MCPClient;
-	private _tool: Tool;
-	public name: string;
-	public inputSchema: Tool['inputSchema'];
-	public description: string;
-
-	constructor(client: MCPClient, tool: Tool) {
-		this._client = client;
-		this._tool = tool;
-		this.name = tool.name;
-		this.inputSchema = tool.inputSchema;
-		this.description = tool.description || '';
-
-		this._client.onclose = () => {
-			console.log("MCP client closed");
-		};
-
-		this._client.onerror = (error) => {
-			console.error("MCP client error:", error);
-		};
-		
-		this._client.fallbackNotificationHandler = this._handleNotification.bind(this);
-		
-	}
-
-	private _handleNotification(notification: any): Promise<void> {
-		console.log("Received notification:", notification);
-		return Promise.resolve();
-	}
-
-	async prepareInvocation(options: vscode.LanguageModelToolInvocationOptions<any>): Promise<{ confirmationMessage?: string; invocationMessage?: string }> {
-		return {
-			confirmationMessage: `Allow tool "${this._tool.name}" to run?`,
-			invocationMessage: `Running tool "${this._tool.name}"...`
-		};
-	}
-
-	async invoke(options: vscode.LanguageModelToolInvocationOptions<any>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
-		console.log("Invoking tool:", this._tool.name, options.input);
-		try{
-			const ping = await this._client.ping();
-		} catch(e) {
-			console.log("Reconnecting with transport:", this._client.transport);
-			await this._client.transport?.start();
-		}
-		try {
-			// Define the payload
-			const payload: CallToolRequest["params"] = {
-				name: this._tool.name,
-				arguments: options.input,
-				// _meta: {
-				// 	toolCallId: options.toolInvocationToken,
-				// 	progressToken: options.toolInvocationToken
-				// }
-			};
-			console.log("CallToolRequest Params:", payload);
-			const result = await this._client.callTool(payload, );
-			console.log("Tool result:", result);
-			// Convert MCP result to LanguageModelToolResult
-			let content: (vscode.LanguageModelTextPart | vscode.LanguageModelPromptTsxPart)[] = [];
-			if (Array.isArray(result.content)) {
-				for (const item of result.content) {
-					if (item.type === 'text' && typeof item.text === 'string') {
-						content.push(new vscode.LanguageModelTextPart(item.text));
-					}
-				}
-			}
-
-			return new vscode.LanguageModelToolResult(content);
-		} catch (error) {
-			console.error('Tool invocation error:', error);
-			throw new Error(`Tool "${this._tool.name}" failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-		}
-	}
-}
+// McpProxyTool has been moved to its own file
 // async function onServerStarted(serverProcess: ServerProcess) {
 // 	if (serverProcess.mcpClient) {
 // 		const toolDefs = await serverProcess.mcpClient.listTools();
