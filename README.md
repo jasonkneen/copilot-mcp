@@ -1,12 +1,12 @@
 # Copilot MCP Client for VSCode
 
-<div align="center">
 
-<img src="logo.png" alt="Copilot MCP Logo" width="200" />
 
 <div style="display: flex; justify-content: center; gap: 20px; margin: 20px 0;">
   <img width="1461" alt="image" src="https://github.com/user-attachments/assets/5ce9ec67-6f8a-4564-a27d-33e21026a3e3" />
 </div>
+<div align="center">
+<img src="logo.png" alt="Copilot MCP Logo" width="200" />
 
 ![Version](https://img.shields.io/badge/version-0.0.13-blue.svg?cacheSeconds=2592000)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
