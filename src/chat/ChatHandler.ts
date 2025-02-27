@@ -5,10 +5,10 @@ import { ToolManager } from '../managers/ToolManager';
 import { ResourceManager } from '../managers/ResourceManager';
 
 /**
- * Handles chat functionality for MCP integration by directly implementing
- * the necessary interfaces for chat participation
+ * Handles chat functionality for MCP integration by providing
+ * chat handling and followup capabilities
  */
-export class ChatHandler implements vscode.ChatRequestHandler, vscode.ChatFollowupProvider {
+export class ChatHandler implements vscode.ChatFollowupProvider {
   private _participant?: vscode.ChatParticipant;
   private _logoPath: vscode.Uri;
 
@@ -159,10 +159,10 @@ export class ChatHandler implements vscode.ChatRequestHandler, vscode.ChatFollow
    * @returns The chat participant disposable
    */
   public register(): vscode.Disposable {
-    // Create the chat participant
+    // Create the chat participant with a handler function
     const participant = vscode.chat.createChatParticipant(
       'copilot-mcp.mcp', 
-      this // Using 'this' directly as we now implement the ChatRequestHandler interface
+      (request, context, stream, token) => this.handleRequest(request, context, stream, token)
     );
     
     // Set followup provider (this class implements the interface)
