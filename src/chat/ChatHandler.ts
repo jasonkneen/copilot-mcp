@@ -5,26 +5,32 @@ import { ToolManager } from '../managers/ToolManager';
 import { ResourceManager } from '../managers/ResourceManager';
 
 /**
- * Handles chat functionality for MCP integration
+ * Handles chat functionality for MCP integration by directly implementing
+ * the necessary interfaces for chat participation
  */
-export class ChatHandler {
+export class ChatHandler implements vscode.ChatRequestHandler, vscode.ChatFollowupProvider {
   private _participant?: vscode.ChatParticipant;
+  private _logoPath: vscode.Uri;
 
   /**
    * Creates a new chat handler
    * @param toolManager The tool manager instance
    * @param resourceManager The resource manager instance
+   * @param extensionUri The extension URI
    */
   constructor(
     private readonly toolManager: ToolManager,
     private readonly resourceManager: ResourceManager,
-    private readonly context: vscode.ExtensionContext
+    private readonly extensionUri: vscode.ExtensionContext['extensionUri']
   ) {
     console.log('ChatHandler initialized');
+    
+    // Set the logo path for the participant
+    this._logoPath = vscode.Uri.joinPath(this.extensionUri, 'icon.png');
   }
 
   /**
-   * Handle chat requests
+   * Implement the ChatRequestHandler interface method
    * @param request The chat request
    * @param context The chat context
    * @param stream The response stream
@@ -70,6 +76,31 @@ export class ChatHandler {
       
       return {};
     }
+  }
+
+  /**
+   * Implement the ChatFollowupProvider interface method
+   * @param result The chat result
+   * @param context The context
+   * @param token The cancellation token
+   * @returns The followup items
+   */
+  public provideFollowups(
+    result: vscode.ChatResult,
+    context: vscode.ChatContext,
+    token: vscode.CancellationToken
+  ): vscode.ProviderResult<vscode.ChatFollowup[]> {
+    // Check if this is a resource-related result
+    if (result.metadata?.command === 'readResource') {
+      return [
+        {
+          label: 'Read Resource',
+          command: 'copilot-mcp.readResource',
+          prompt: 'Read the resource'
+        }
+      ];
+    }
+    return [];
   }
 
   /**
@@ -131,24 +162,14 @@ export class ChatHandler {
     // Create the chat participant
     const participant = vscode.chat.createChatParticipant(
       'copilot-mcp.mcp', 
-      (request, context, stream, token) => this.handleRequest(request, context, stream, token)
+      this // Using 'this' directly as we now implement the ChatRequestHandler interface
     );
     
-    // Add followup provider
-    participant.followupProvider = {
-      provideFollowups: (result, context, token) => {
-        if (result.metadata?.command === 'readResource') {
-          return [
-            {
-              label: 'Read Resource',
-              command: 'copilot-mcp.readResource',
-              prompt: 'Read the resource'
-            }
-          ];
-        }
-        return [];
-      }
-    };
+    // Set followup provider (this class implements the interface)
+    participant.followupProvider = this;
+    
+    // Set icon path
+    participant.iconPath = this._logoPath;
     
     // Store the participant reference
     this._participant = participant;
@@ -168,7 +189,7 @@ export class ChatHandler {
     toolManager: ToolManager,
     resourceManager: ResourceManager
   ): vscode.Disposable {
-    const handler = new ChatHandler(toolManager, resourceManager, context);
+    const handler = new ChatHandler(toolManager, resourceManager, context.extensionUri);
     return handler.register();
   }
 }
