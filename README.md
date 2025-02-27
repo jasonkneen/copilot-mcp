@@ -5,8 +5,7 @@
 <img src="logo.png" alt="Copilot MCP Logo" width="200" />
 
 <div style="display: flex; justify-content: center; gap: 20px; margin: 20px 0;">
-  <img src="media/controls.png" alt="MCP Controls" width="400" />
-  <img src="media/image.png" alt="MCP Interface" width="400" />
+  <img width="1461" alt="image" src="https://github.com/user-attachments/assets/5ce9ec67-6f8a-4564-a27d-33e21026a3e3" />
 </div>
 
 ![Version](https://img.shields.io/badge/version-0.0.13-blue.svg?cacheSeconds=2592000)
