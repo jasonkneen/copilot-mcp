@@ -7,7 +7,7 @@ import { ChildProcess, spawn } from 'child_process';
 import { Client as MCPClient } from "@modelcontextprotocol/sdk/client/index";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio";
 import { CallToolRequest, Resource, Tool } from "@modelcontextprotocol/sdk/types";
-import { sendChatParticipantRequest } from '@vscode/chat-extension-utils';
+import { ChatHandler } from './chat/ChatHandler';
 
 
 interface ServerConfig {
@@ -142,48 +142,22 @@ class MCPServerViewProvider implements vscode.WebviewViewProvider {
 		context: vscode.ChatContext,
 		stream: vscode.ChatResponseStream,
 		token: vscode.CancellationToken
-	  ): Promise<any> => {
-		if(request.command === 'listResources') {
-			console.log("Command:", request.command);
-			const resources = Array.from(this._processes.values()).flatMap(process => process.resources);
-			if (resources.length === 0) {
-				stream.push(new vscode.ChatResponseMarkdownPart(new vscode.MarkdownString("No resources found")));
-				return;
-			}
-			const markdown = new vscode.MarkdownString();
-			markdown.supportHtml = true;
-			markdown.appendMarkdown(`<h2>Resources</h2>`);
-			for (const resource of resources) {
-				markdown.appendMarkdown(`<strong>${resource.name}:</strong>`);
-				// for the resource text, if the mime type is text/plain, then just return the text
-				// for octet-stream, check if there is a blob property assume base64 encoded and decode it
-				if (resource.mimeType === 'text/plain') {
-					markdown.appendMarkdown(`<p>${resource.text}</p>`);
-				} else if (resource.mimeType === 'application/octet-stream') {
-					if (resource.blob) {
-						markdown.appendMarkdown(`<p>${Buffer.from(resource.blob as string, 'base64').toString('utf-8')}</p>`);
-					} else {
-						markdown.appendMarkdown(`<p>No contents could be displayed</p>`);
-					}
-				} 
-				markdown.appendMarkdown(`<p>URI: ${resource.uri}</p>`);
-				markdown.appendMarkdown('<hr>');
-			}
-			stream.push(new vscode.ChatResponseMarkdownPart(markdown));
-			return;
-		}
+	): Promise<any> => {
+		// Get all resources from running servers
+		const resources = Array.from(this._processes.values()).flatMap(process => process.resources);
 		
+		// Get all tools
 		const tools = this.getAllTools();
-		console.log("Available tools:", tools);
-		const chatResult = sendChatParticipantRequest(request, context, {
-			responseStreamOptions: {
-				stream,
-				references: true,
-				responseText: true
-			},
-			tools: tools
-		}, token);
-		return await chatResult.result;
+		
+		// Use the ChatHandler to handle the request
+		return ChatHandler.handleChatRequest(
+			resources,
+			tools,
+			request,
+			context,
+			stream,
+			token
+		);
 	};
 
 	public resolveWebviewView(
