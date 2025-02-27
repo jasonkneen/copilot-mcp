@@ -120,11 +120,15 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                 const isRunning = processesMap.has(server.id);
                 const serverProcess = isRunning ? processesMap.get(server.id) : undefined;
                 
+                // Ensure tools and resources are properly included
+                const tools = serverProcess?.tools || [];
+                const resources = serverProcess?.resources || [];
+                
                 return {
                     ...server,
                     running: isRunning,
-                    tools: serverProcess?.tools || [],
-                    resources: serverProcess?.resources || []
+                    tools,
+                    resources
                 };
             });
 
@@ -132,6 +136,18 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                 type: 'setServers', 
                 servers: serversWithState 
             });
+            
+            // Send tools for each server separately after initial state
+            // This ensures proper tool registration in the UI
+            for (const server of serversWithState) {
+                if (server.tools && server.tools.length > 0) {
+                    this._view.webview.postMessage({
+                        type: 'updateServerTools',
+                        serverId: server.id,
+                        tools: server.tools
+                    });
+                }
+            }
         } catch (error) {
             ErrorHandler.handleError('Send Initial State', error);
         }
@@ -152,11 +168,39 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
         }
 
         try {
+            const server = this.serverManager.getServer(serverId);
+            if (!server) {
+                return;
+            }
+            
+            // Get the full server data with running state
+            const processesMap = this.serverManager['_processes'] as Map<string, ServerProcess>;
+            const isRunning = processesMap.has(serverId);
+            const serverProcess = isRunning ? processesMap.get(serverId) : undefined;
+            
+            // Collect tools and resources from the server process if running
+            const tools = state.tools || serverProcess?.tools || [];
+            const resources = state.resources || serverProcess?.resources || [];
+            
+            // Send the complete updated server state
             this._view.webview.postMessage({
-                type: 'updateServerState',
-                serverId,
-                state
+                type: 'updateServer',
+                server: {
+                    ...server,
+                    running: state.running !== undefined ? state.running : isRunning,
+                    tools: tools,
+                    resources: resources
+                }
             });
+            
+            // Also send tools update as a separate message to ensure UI registers them correctly
+            if (tools.length > 0) {
+                this._view.webview.postMessage({
+                    type: 'updateServerTools',
+                    serverId,
+                    tools
+                });
+            }
         } catch (error) {
             ErrorHandler.handleError('Update Server State', error);
         }
@@ -200,8 +244,14 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                             type: message.server.type || ServerType.PROCESS,
                             command: '', // Default empty command
                             enabled: message.server.enabled ?? true,
-                            env: message.server.env || {}
+                            env: undefined // Initialize as undefined
                         };
+                        
+                        // Only include env if it has values
+                        if (message.server.env && Object.keys(message.server.env).length > 0) {
+                            newServer.env = message.server.env;
+                            console.log('Processing environment variables for new server:', newServer.env);
+                        }
                         
                         // Add appropriate fields based on server type
                         const serverType = newServer.type || ServerType.PROCESS;
@@ -254,7 +304,15 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                         
                         if (serverType === ServerType.PROCESS) {
                             updates.command = message.server.command;
-                            updates.env = message.server.env;
+                            
+                            // Handle environment variables carefully
+                            if (message.server.env && Object.keys(message.server.env).length > 0) {
+                                updates.env = message.server.env;
+                                console.log('Editing server with environment variables:', updates.env);
+                            } else {
+                                // Explicitly set to undefined if no env vars to avoid empty object issues
+                                updates.env = undefined;
+                            }
                         } else if (serverType === ServerType.SSE) {
                             updates.url = message.server.url;
                             updates.authToken = message.server.authToken;
@@ -281,18 +339,27 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                         const isRunning = processesMap.has(message.id);
                         const server = this.serverManager.getServer(message.id);
                         
-                        if (message.enabled && !isRunning && server) {
-                            // Start the server
-                            await this.serverManager.startServer(server);
-                            if (this._logger) {
-                                this._logger.log(`Started server: ${message.id}`);
+                        if (server) {
+                            // Update the server's enabled status in the configuration
+                            server.enabled = message.enabled;
+                            await this.serverManager.updateServer(server);
+                            
+                            if (message.enabled && !isRunning) {
+                                // Start the server
+                                await this.serverManager.startServer(server);
+                                if (this._logger) {
+                                    this._logger.log(`Started server: ${message.id}`);
+                                }
+                            } else if (!message.enabled && isRunning) {
+                                // Stop the server
+                                await this.serverManager.stopServer(message.id);
+                                if (this._logger) {
+                                    this._logger.log(`Stopped server: ${message.id}`);
+                                }
                             }
-                        } else if (!message.enabled && isRunning) {
-                            // Stop the server
-                            await this.serverManager.stopServer(message.id);
-                            if (this._logger) {
-                                this._logger.log(`Stopped server: ${message.id}`);
-                            }
+                            
+                            // Update UI immediately with server status and tools
+                            await this._sendInitialState();
                         }
                     }
                     break;

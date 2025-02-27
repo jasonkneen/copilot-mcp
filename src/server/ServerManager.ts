@@ -200,38 +200,63 @@ export class ServerManager {
         outputChannel.appendLine(`Starting server: ${server.name}`);
         outputChannel.appendLine(`Command: ${server.command}`);
         
-        // Parse command and arguments
-        const [cmd, ...args] = server.command.split(' ');
+        // Create environment with server-specific variables properly merged
+        // Start with a fresh copy of the current process environment
+        const envVars = { ...globalThis.process.env };
         
-        // Spawn the process
-        const process = spawn(cmd, args, {
+        // Add any server-specific environment variables
+        if (server.env && Object.keys(server.env).length > 0) {
+            outputChannel.appendLine(`Environment variables:`);
+            for (const [key, value] of Object.entries(server.env)) {
+                // Make sure the values are strings
+                const strValue = String(value).trim();
+                envVars[key.trim()] = strValue;
+                outputChannel.appendLine(`  ${key}=${strValue}`);
+            }
+            
+            // Special handling for FireCrawl API key - export it directly in the shell command
+            // This is a workaround for tools that read env vars at startup time
+            if (server.env.FIRECRAWL_API_KEY) {
+                outputChannel.appendLine(`Detected FireCrawl API key - using export in shell command`);
+                const apiKey = String(server.env.FIRECRAWL_API_KEY).trim();
+                const shellPrefix = globalThis.process.platform === 'win32' 
+                    ? `set FIRECRAWL_API_KEY=${apiKey} && ` 
+                    : `export FIRECRAWL_API_KEY="${apiKey}" && `;
+                server.command = shellPrefix + server.command;
+                outputChannel.appendLine(`Modified command: ${server.command}`);
+            }
+        }
+                
+        // Spawn the process with the complete command and carefully merged environment
+        // Use shell:true to ensure environment variables are properly passed through
+        const childProcess = spawn(server.command, [], {
             stdio: 'pipe',
             shell: true,
-            env: {
-                ...globalThis.process.env,
-                ...(server.env || {})
-            }
+            env: envVars,
+            windowsVerbatimArguments: globalThis.process.platform === 'win32'
         });
+        
+        outputChannel.appendLine(`Process spawned with PID: ${childProcess.pid || 'unknown'}`);
         
         // Store process info
         this._processes.set(server.id, {
-            process,
+            process: childProcess,
             outputChannel,
             tools: [],
             resources: []
         });
         
         // Handle process output
-        process.stdout?.on('data', (data: Buffer) => {
+        childProcess.stdout?.on('data', (data: Buffer) => {
             outputChannel.append(data.toString());
         });
         
-        process.stderr?.on('data', (data: Buffer) => {
+        childProcess.stderr?.on('data', (data: Buffer) => {
             outputChannel.append(data.toString());
         });
         
         // Handle process exit
-        process.on('close', async (code: number | null) => {
+        childProcess.on('close', async (code: number | null) => {
             outputChannel.appendLine(`\nProcess exited with code ${code}`);
             
             // Clean up
@@ -257,7 +282,7 @@ export class ServerManager {
         });
         
         // Handle process error
-        process.on('error', (err: Error) => {
+        childProcess.on('error', (err: Error) => {
             outputChannel.appendLine(`\nProcess error: ${err.message}`);
             ErrorHandler.handleError(`Server process ${server.id} (${server.name})`, err);
         });
@@ -266,13 +291,13 @@ export class ServerManager {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Check if process is still running
-        if (process.exitCode !== null) {
-            throw new Error(`Process exited immediately with code ${process.exitCode}`);
+        if (childProcess.exitCode !== null) {
+            throw new Error(`Process exited immediately with code ${childProcess.exitCode}`);
         }
         
         // Initialize MCP client
         const mcpClient = new MCPClientWrapper(ServerType.PROCESS);
-        await mcpClient.connectToProcess(process);
+        await mcpClient.connectToProcess(childProcess);
         
         // Store MCP client
         this._mcp.set(server.id, mcpClient);
