@@ -25,6 +25,8 @@ export interface ServerConfig {
     type?: ServerType;
     /** Command to start the server (for process servers) */
     command: string;
+    /** Arguments for the server command (for process servers) */
+    args?: string[];
     /** URL for SSE connection (for SSE servers) */
     url?: string;
     /** Whether the server is enabled and should auto-start */

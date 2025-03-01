@@ -3,6 +3,8 @@ import { sendChatParticipantRequest } from '@vscode/chat-extension-utils';
 import { Resource } from "@modelcontextprotocol/sdk/types";
 import { ToolManager } from '../managers/ToolManager';
 import { ResourceManager } from '../managers/ResourceManager';
+import { MCPClientManager } from '@automatalabs/mcp-client-manager';
+import { McpProxyTool } from '@/tools/McpProxyTool';
 
 /**
  * Handles chat functionality for MCP integration by providing
@@ -19,8 +21,7 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
    * @param extensionUri The extension URI
    */
   constructor(
-    private readonly toolManager: ToolManager,
-    private readonly resourceManager: ResourceManager,
+    private readonly mcpClientManager: MCPClientManager,
     private readonly extensionUri: vscode.ExtensionContext['extensionUri']
   ) {
     console.log('ChatHandler initialized');
@@ -52,7 +53,12 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
       }
       
       // Get all available tools from the tool manager
-      const tools = this.toolManager.getAllTools();
+      const allTools = await this.mcpClientManager.listTools();
+      
+      const tools = allTools.map(tool => {
+        const chatTool = new McpProxyTool(this.mcpClientManager, tool);
+        return chatTool;
+      });
       console.log("Available tools:", tools.length);
       
       // Forward the request to VS Code's chat system with our tools
@@ -111,8 +117,8 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
     stream: vscode.ChatResponseStream
   ): Promise<vscode.ChatResult> {
     // Get resources from the resource manager
-    const resources = this.resourceManager.getAllResources();
-    
+    const resources = await this.mcpClientManager.listResources();
+      
     if (resources.length === 0) {
       stream.push(new vscode.ChatResponseMarkdownPart(
         new vscode.MarkdownString("No resources found")
@@ -186,10 +192,9 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
    */
   public static register(
     context: vscode.ExtensionContext,
-    toolManager: ToolManager,
-    resourceManager: ResourceManager
+    mcpClientManager: MCPClientManager
   ): vscode.Disposable {
-    const handler = new ChatHandler(toolManager, resourceManager, context.extensionUri);
+    const handler = new ChatHandler(mcpClientManager, context.extensionUri);
     return handler.register();
   }
 }

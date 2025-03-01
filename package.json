@@ -129,6 +129,13 @@
                 "type": "string",
                 "description": "Command to start the server (for process servers)"
               },
+              "args": {
+                "type": "array",
+                "description": "Arguments for the server command",
+                "items": {
+                  "type": "string"
+                }
+              },
               "url": {
                 "type": "string",
                 "description": "URL for SSE server connection (for SSE servers)"
@@ -172,6 +179,7 @@
     "@types/node": "^20.17.19",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
+    "@types/shell-quote": "^1.7.5",
     "@types/vscode": "^1.97.0",
     "@typescript-eslint/eslint-plugin": "^8.22.0",
     "@typescript-eslint/parser": "^8.22.0",
@@ -191,6 +199,7 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
+    "@automatalabs/mcp-client-manager": "^1.0.5",
     "@modelcontextprotocol/sdk": "^1.5.0",
     "@radix-ui/react-collapsible": "^1.1.3",
     "@radix-ui/react-dialog": "^1.1.6",
@@ -211,7 +220,9 @@
     "next-themes": "^0.4.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "shell-quote": "^1.8.2",
     "sonner": "^2.0.1",
+    "spawn-rx": "^5.1.2",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7"
   }

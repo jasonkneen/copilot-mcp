@@ -3,6 +3,21 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
+
+// Check if the CJS files exist
+const sdkPath = path.resolve(__dirname, 'node_modules/@modelcontextprotocol/sdk');
+const cjsClientPath = path.resolve(sdkPath, 'dist/cjs/client/index.js');
+const cjsTypesPath = path.resolve(sdkPath, 'dist/cjs/types.js');
+
+// Get proper paths depending on what exists
+const clientPath = fs.existsSync(cjsClientPath) 
+  ? cjsClientPath 
+  : path.resolve(sdkPath, 'dist/esm/client/index.js');
+
+const typesPath = fs.existsSync(cjsTypesPath)
+  ? cjsTypesPath
+  : path.resolve(sdkPath, 'dist/esm/types.js');
 
 //@ts-check
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
@@ -27,7 +42,10 @@ const extensionConfig = {
     // support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
     extensions: ['.ts', '.tsx', '.js', '.jsx'],
     alias: {
-      '@': path.resolve(__dirname, 'src')
+      '@': path.resolve(__dirname, 'src'),
+      // Explicitly alias the problematic imports to their actual paths
+      '@modelcontextprotocol/sdk/client/index': clientPath,
+      '@modelcontextprotocol/sdk/types': typesPath
     }
   },
   module: {
@@ -67,7 +85,10 @@ const webviewConfig = {
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.jsx'],
     alias: {
-      '@': path.resolve(__dirname, 'src')
+      '@': path.resolve(__dirname, 'src'),
+      // Explicitly alias the problematic imports to their actual paths
+      '@modelcontextprotocol/sdk/client/index': clientPath,
+      '@modelcontextprotocol/sdk/types': typesPath
     }
   },
   module: {

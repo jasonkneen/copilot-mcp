@@ -1,12 +1,12 @@
 import * as vscode from 'vscode';
-import { ServerManager } from '../server/ServerManager';
 import { Logger } from '../utils/Logger';
 import { ErrorHandler } from '../utils/ErrorHandler';
-import { MCPClientWrapper } from '../mcp/MCPClientWrapper';
 import { Tool, Resource } from '@modelcontextprotocol/sdk/types';
 import { EventBus } from '../utils/EventBus';
-import { ServerConfig, ServerEventType, ServerType, ServerProcess } from '../server/ServerConfig';
-
+import { ServerEventType, ServerType } from '../server/ServerConfig';
+import { MCPClientManager, Transport } from '@automatalabs/mcp-client-manager';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse';
 /**
  * WebviewProvider for the MCP Server Manager UI
  */
@@ -18,11 +18,11 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
     /**
      * Creates a new server view provider
      * @param context The extension context
-     * @param serverManager The server manager instance
+     * @param clientManager The client manager instance
      */
     constructor(
         private readonly context: vscode.ExtensionContext,
-        private readonly serverManager: ServerManager
+        private readonly clientManager: MCPClientManager
     ) {
         try {
             this._logger = Logger.getInstance();
@@ -113,33 +113,52 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
         }
 
         try {
-            const servers = this.serverManager.getServers();
-            const serversWithState = servers.map((server: ServerConfig) => {
+            const serverNames = this.clientManager.listServerNames();
+            
+            const servers = await serverNames.reduce(async (accPromise, server: string) => {
+                // Wait for previous promise to resolve
+                const acc = await accPromise;
+                
+                // get the info
+                const client = this.clientManager.getClientIdByServerName(server);
+                if (!client) {return acc;}
+                
+                const clientWrapper = this.clientManager.getClientInfo(client);
+                if (!clientWrapper) {return acc;}
+                
                 // Get running servers from the server manager
-                const processesMap = this.serverManager['_processes'] as Map<string, ServerProcess>;
-                const isRunning = processesMap.has(server.id);
-                const serverProcess = isRunning ? processesMap.get(server.id) : undefined;
+                const isRunning = this.clientManager.isClientHealthy(client);
                 
                 // Ensure tools and resources are properly included
-                const tools = serverProcess?.tools || [];
-                const resources = serverProcess?.resources || [];
+                const tools = await this.clientManager.getClientTools(client) || [];
+                const resources = await this.clientManager.getClientResources(client) || [];
                 
-                return {
-                    ...server,
+                // Add valid server to accumulator
+                acc.push({
+                    id: client, // Add id field for referencing in updateServerTools
+                    name: server,
                     running: isRunning,
                     tools,
                     resources
-                };
-            });
+                });
+                
+                return acc;
+            }, Promise.resolve([] as Array<{
+                id: string;
+                name: string;
+                running: boolean;
+                tools: Tool[];
+                resources: Resource[];
+            }>));
 
             this._view.webview.postMessage({ 
                 type: 'setServers', 
-                servers: serversWithState 
+                servers: servers 
             });
             
             // Send tools for each server separately after initial state
             // This ensures proper tool registration in the UI
-            for (const server of serversWithState) {
+            for (const server of servers) {
                 if (server.tools && server.tools.length > 0) {
                     this._view.webview.postMessage({
                         type: 'updateServerTools',
@@ -158,35 +177,33 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
      * @param serverId The server ID
      * @param state The updated state properties
      */
-    private _updateServerState(serverId: string, state: Partial<{
+    private async _updateServerState(serverId: string, state: Partial<{
         running: boolean;
         tools: Tool[];
         resources: Resource[];
-    }>): void {
+    }>): Promise<void> {
         if (!this._view) {
             return;
         }
 
         try {
-            const server = this.serverManager.getServer(serverId);
-            if (!server) {
+            const serverClient = this.clientManager.getClientInfo(serverId);
+            if (!serverClient) {
                 return;
             }
             
             // Get the full server data with running state
-            const processesMap = this.serverManager['_processes'] as Map<string, ServerProcess>;
-            const isRunning = processesMap.has(serverId);
-            const serverProcess = isRunning ? processesMap.get(serverId) : undefined;
+            const isRunning = this.clientManager.isClientHealthy(serverId);
             
             // Collect tools and resources from the server process if running
-            const tools = state.tools || serverProcess?.tools || [];
-            const resources = state.resources || serverProcess?.resources || [];
+            const tools = await this.clientManager.getClientTools(serverId) || [];
+            const resources = await this.clientManager.getClientResources(serverId) || [];
             
             // Send the complete updated server state
             this._view.webview.postMessage({
                 type: 'updateServer',
                 server: {
-                    ...server,
+                    ...serverClient,
                     running: state.running !== undefined ? state.running : isRunning,
                     tools: tools,
                     resources: resources
@@ -237,51 +254,36 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                 
                 case 'addServer':
                     if (message.server) {
-                        // Create base server config with required fields
-                        const newServer: Omit<ServerConfig, 'id'> & { id?: string } = {
-                            id: crypto.randomUUID(), // Add ID for the new server
-                            name: message.server.name,
-                            type: message.server.type || ServerType.PROCESS,
-                            command: '', // Default empty command
-                            enabled: message.server.enabled ?? true,
-                            env: undefined // Initialize as undefined
-                        };
-                        
-                        // Only include env if it has values
-                        if (message.server.env && Object.keys(message.server.env).length > 0) {
-                            newServer.env = message.server.env;
-                            console.log('Processing environment variables for new server:', newServer.env);
-                        }
-                        
-                        // Add appropriate fields based on server type
-                        const serverType = newServer.type || ServerType.PROCESS;
-                        
+                        const serverType = message.server.type || ServerType.PROCESS;
+                        let transport: Transport;
                         if (serverType === ServerType.PROCESS) {
-                            newServer.command = message.server.command;
-                        } else if (serverType === ServerType.SSE) {
-                            newServer.url = message.server.url;
-                            newServer.authToken = message.server.authToken;
+                            transport = new StdioClientTransport({
+                                command: message.server.command,
+                                env: message.server.env
+                            });
+                        } else if(serverType === ServerType.SSE) {
+                            transport = new SSEClientTransport(message.server.url);
+                            
+                        } else {
+                            throw new Error(`Unsupported server type: ${serverType}`);
                         }
                         
-                        // Create a server config object without the temporary id property
-                        const { id, ...serverWithoutId } = newServer;
-                        const serverConfig: ServerConfig = {
-                            id: id!, // Use the generated ID
-                            ...serverWithoutId
-                        };
+                        const client = await this.clientManager.addServer(transport, message.server.name, {
+                            authToken: message.server.authToken,
+                            env: message.server.env
+                        });
                         
-                        await this.serverManager.addServer(serverConfig);
                         await this._sendInitialState();
                         
                         if (this._logger) {
-                            this._logger.log(`Added ${serverType} server: ${newServer.name}`);
+                            this._logger.log(`Added ${serverType} server: ${client}`);
                         }
                     }
                     break;
                 
                 case 'removeServer':
                     if (message.id) {
-                        await this.serverManager.removeServer(message.id);
+                        this.clientManager.removeClient(message.id);
                         await this._sendInitialState();
                         
                         if (this._logger) {
@@ -292,75 +294,35 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                 
                 case 'editServer':
                     if (message.server && message.server.id) {
-                        const server = this.serverManager.getServer(message.server.id);
-                        const updates: Partial<ServerConfig> = {
-                            name: message.server.name,
-                            // Ensure type is always set - default to the existing type or PROCESS
-                            type: message.server.type || (server?.type || ServerType.PROCESS)
-                        };
-                        
-                        // Add appropriate fields based on server type
-                        const serverType = updates.type || ServerType.PROCESS;
-                        
-                        if (serverType === ServerType.PROCESS) {
-                            updates.command = message.server.command;
-                            
-                            // Handle environment variables carefully
-                            if (message.server.env && Object.keys(message.server.env).length > 0) {
-                                updates.env = message.server.env;
-                                console.log('Editing server with environment variables:', updates.env);
-                            } else {
-                                // Explicitly set to undefined if no env vars to avoid empty object issues
-                                updates.env = undefined;
-                            }
-                        } else if (serverType === ServerType.SSE) {
-                            updates.url = message.server.url;
-                            updates.authToken = message.server.authToken;
-                        }
-                        
-                        // Create a complete server config by combining the existing server with updates
-                        const updatedServer: ServerConfig = {
-                            ...server!,
-                            ...updates
-                        };
-                        await this.serverManager.updateServer(updatedServer);
-                        await this._sendInitialState();
-                        
-                        if (this._logger) {
-                            this._logger.log(`Updated server: ${message.server.id}`);
-                        }
+                        throw new Error('Edit server not supported');
                     }
                     break;
                 
                 case 'toggleServer':
                     if (message.id !== undefined) {
                         // Get running servers from the server manager
-                        const processesMap = this.serverManager['_processes'] as Map<string, ServerProcess>;
-                        const isRunning = processesMap.has(message.id);
-                        const server = this.serverManager.getServer(message.id);
-                        
-                        if (server) {
-                            // Update the server's enabled status in the configuration
-                            server.enabled = message.enabled;
-                            await this.serverManager.updateServer(server);
-                            
-                            if (message.enabled && !isRunning) {
-                                // Start the server
-                                await this.serverManager.startServer(server);
-                                if (this._logger) {
-                                    this._logger.log(`Started server: ${message.id}`);
-                                }
-                            } else if (!message.enabled && isRunning) {
-                                // Stop the server
-                                await this.serverManager.stopServer(message.id);
-                                if (this._logger) {
-                                    this._logger.log(`Stopped server: ${message.id}`);
-                                }
+                        const client = this.clientManager.getClientInfo(message.id);
+                        if (!client) {
+                            return;
+                        }
+                        const isRunning = this.clientManager.isClientHealthy(message.id);
+                        if (!isRunning) {
+                            // toggle the server on
+                            await this.clientManager.reconnectClient(message.id);
+                            if (this._logger) {
+                                this._logger.log(`Started server: ${message.id}`);
                             }
+                        } else {
+                            // toggle the server off
+                            await this.clientManager.disconnectClient(message.id);
+                            if (this._logger) {
+                                this._logger.log(`Stopped server: ${message.id}`);
+                            }
+                        }
+                        
                             
                             // Update UI immediately with server status and tools
-                            await this._sendInitialState();
-                        }
+                        await this._sendInitialState();
                     }
                     break;
             }
@@ -497,9 +459,9 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
      */
     public static async createOrShow(
         context: vscode.ExtensionContext,
-        serverManager: ServerManager
+        clientManager: MCPClientManager
     ): Promise<ServerViewProvider> {
-        const provider = new ServerViewProvider(context, serverManager);
+        const provider = new ServerViewProvider(context, clientManager);
         
         // Register the webview provider
         const provider_registration = vscode.window.registerWebviewViewProvider(

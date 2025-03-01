@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import { Client as MCPClient } from "@modelcontextprotocol/sdk/client/index";
+
 import { Resource } from "@modelcontextprotocol/sdk/types";
+import { MCPClientManager } from '@automatalabs/mcp-client-manager';
 
 /**
  * ResourceManager handles registration and management of MCP resources
@@ -20,7 +21,7 @@ export class ResourceManager {
      * @param client The MCP client
      * @param resources The resources to register
      */
-    public async registerResources(serverId: string, client: MCPClient, resources: Resource[]): Promise<void> {
+    public async registerResources(serverId: string, client: MCPClientManager, resources: Resource[]): Promise<void> {
         try {
             const registrations: vscode.Disposable[] = [];
 
@@ -42,9 +43,13 @@ export class ResourceManager {
                     const commandHandler = async () => {
                         try {
                             console.log(`Reading resource: ${resource.name}`);
-                            const resourceContent = await client.readResource({ uri: resource.uri });
-                            console.log('Resource content:', resourceContent);
-                            
+                            const resourceContent = await client.getClientResources(serverId);
+                            const foundResource = resourceContent.find(r => r.uri === resource.uri);
+                            if (!foundResource) {
+                                throw new Error(`Resource ${resource.name} not found`);
+                            }
+                            console.log('Resource content:', foundResource);
+                            return foundResource;
                             // You could do something with the resource content here,
                             // like showing it in a webview or text document
                         } catch (error) {
@@ -117,7 +122,7 @@ export class ResourceManager {
      * @param client The MCP client
      * @param resources The updated resources
      */
-    public async refreshResourcesForServer(serverId: string, client: MCPClient, resources: Resource[]): Promise<void> {
+    public async refreshResourcesForServer(serverId: string, client: MCPClientManager, resources: Resource[]): Promise<void> {
         try {
             // First unregister existing resources
             this.unregisterResources(serverId);

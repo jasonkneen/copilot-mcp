@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { 
-  ChevronDown, 
   ChevronRight, 
   Edit, 
-  MoreHorizontal, 
   Trash, 
   Terminal, 
   Globe, 
-  Server, 
-  Power,
   AlertCircle,
   Info, 
   Copy,
@@ -25,7 +21,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
   CardHeader,
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -35,13 +30,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -62,9 +50,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
 
-import { ServerConfig, ServerWithTools, ServerType, EnvVar } from "../types";
+import { ServerWithTools, ServerType, EnvVar } from "../types";
 
 type ServerCardProps = React.ComponentProps<typeof Card> & {
   server: ServerWithTools;
