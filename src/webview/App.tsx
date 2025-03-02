@@ -70,6 +70,10 @@ export function App() {
   const [envVars, setEnvVars] = useState<EnvVar[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const validateServerName = (name: string): boolean => {
+    return /^[a-zA-Z0-9_-]+$/.test(name);
+  };
+
   useEffect(() => {
     // Listen for messages from the extension
     const messageHandler = (event: MessageEvent) => {
@@ -112,6 +116,11 @@ export function App() {
     // Validate inputs
     if (!serverName.trim()) {
       setFormError('Server name is required');
+      return;
+    }
+    
+    if (!validateServerName(serverName)) {
+      setFormError('Server name can only contain letters, numbers, dashes, and underscores');
       return;
     }
     

@@ -76,6 +76,10 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
   // Force rerenders when toggle is clicked
   const [localEnabled, setLocalEnabled] = useState(server.enabled);
 
+  const validateServerName = (name: string): boolean => {
+    return /^[a-zA-Z0-9_-]+$/.test(name);
+  };
+
   useEffect(() => {
     // Always keep local state in sync with server state
     setLocalEnabled(server.enabled);
@@ -134,6 +138,11 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
     // Validate required fields
     if (!editName.trim()) {
       setFormError('Server name is required');
+      return;
+    }
+
+    if (!validateServerName(editName)) {
+      setFormError('Server name can only contain letters, numbers, dashes, and underscores');
       return;
     }
 
