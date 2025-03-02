@@ -42,15 +42,15 @@ const handleWebviewMessage = (event: MessageEvent) => {
     case 'updateServer':
       return (current: ServerWithTools[]) => 
         current.map(server => 
-          server.id === message.server.id 
-            ? { ...message.server, tools: message.tools || server.tools }
+          server.name === message.server.name 
+            ? { ...server, ...message.server, tools: message.tools || server.tools, enabled: message.running || server.enabled }
             : server
         );
     case 'updateServerTools':
       return (current: ServerWithTools[]) =>
         current.map(server =>
-          server.id === message.serverId
-            ? { ...server, tools: message.tools }
+          server.name === message.name
+            ? { ...server, tools: message.tools, enabled: message.running }
             : server
         );
     default:
@@ -69,6 +69,10 @@ export function App() {
   const [serverAuthToken, setServerAuthToken] = useState('');
   const [envVars, setEnvVars] = useState<EnvVar[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const validateServerName = (name: string): boolean => {
+    return /^[a-zA-Z0-9_-]+$/.test(name);
+  };
 
   useEffect(() => {
     // Listen for messages from the extension
@@ -112,6 +116,11 @@ export function App() {
     // Validate inputs
     if (!serverName.trim()) {
       setFormError('Server name is required');
+      return;
+    }
+    
+    if (!validateServerName(serverName)) {
+      setFormError('Server name can only contain letters, numbers, dashes, and underscores');
       return;
     }
     
@@ -285,7 +294,7 @@ export function App() {
                 <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
                   {filteredServers.map(server => (
                     <ServerCard
-                      key={server.id}
+                      key={server.name}
                       server={server}
                       onUpdate={() => {
                         toast.success("Server updated", {

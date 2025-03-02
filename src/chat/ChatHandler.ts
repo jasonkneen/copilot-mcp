@@ -1,9 +1,6 @@
 import * as vscode from 'vscode';
 import { sendChatParticipantRequest } from '@vscode/chat-extension-utils';
-import { Resource } from "@modelcontextprotocol/sdk/types";
-import { ToolManager } from '../managers/ToolManager';
-import { ResourceManager } from '../managers/ResourceManager';
-
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 /**
  * Handles chat functionality for MCP integration by providing
  * chat handling and followup capabilities
@@ -11,6 +8,7 @@ import { ResourceManager } from '../managers/ResourceManager';
 export class ChatHandler implements vscode.ChatFollowupProvider {
   private _participant?: vscode.ChatParticipant;
   private _logoPath: vscode.Uri;
+  private _clients: Client[];
 
   /**
    * Creates a new chat handler
@@ -19,14 +17,14 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
    * @param extensionUri The extension URI
    */
   constructor(
-    private readonly toolManager: ToolManager,
-    private readonly resourceManager: ResourceManager,
+    private readonly clients: Client[],
     private readonly extensionUri: vscode.ExtensionContext['extensionUri']
   ) {
     console.log('ChatHandler initialized');
-    
+    console.log('Tools: ', vscode.lm.tools.filter(tool => tool.tags?.includes('mcpManager')));
     // Set the logo path for the participant
     this._logoPath = vscode.Uri.joinPath(this.extensionUri, 'icon.png');
+    this._clients = clients;
   }
 
   /**
@@ -52,20 +50,31 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
       }
       
       // Get all available tools from the tool manager
-      const tools = this.toolManager.getAllTools();
+      // const allTools = await this.mcpClientManager.listTools();
+      const tools = vscode.lm.tools.filter(tool => tool.tags?.includes('mcpManager'));
+      
+
       console.log("Available tools:", tools.length);
       
       // Forward the request to VS Code's chat system with our tools
       const chatResult = sendChatParticipantRequest(request, context, {
+        prompt: `
+        You are a helpful assistant. You can use the following tools to assist the user:
+        ${tools.map(tool => `- ${tool.name}: ${tool.description}`).join('\n')}
+        `,
         responseStreamOptions: {
           stream,
           references: true,
-          responseText: true
+          responseText: true,
         },
         tools: tools
       }, token);
-      
-      return await chatResult.result;
+      stream.progress(
+        "Thinking..."
+      );
+      const result = chatResult.result;
+
+      return await result;
     } catch (error) {
       console.error('Error handling chat request:', error);
       
@@ -111,8 +120,16 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
     stream: vscode.ChatResponseStream
   ): Promise<vscode.ChatResult> {
     // Get resources from the resource manager
-    const resources = this.resourceManager.getAllResources();
-    
+    const resources = [];
+    for(const client of this._clients) {
+      try {
+        const resourcesResponse = await client.listResources();
+        resources.push(...resourcesResponse.resources);
+      } catch(e) {
+        console.warn(`Failed to list resources for client ${client.getServerVersion()?.name}:`);
+      }
+    }
+      
     if (resources.length === 0) {
       stream.push(new vscode.ChatResponseMarkdownPart(
         new vscode.MarkdownString("No resources found")
@@ -186,10 +203,9 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
    */
   public static register(
     context: vscode.ExtensionContext,
-    toolManager: ToolManager,
-    resourceManager: ResourceManager
+    clients: Client[]
   ): vscode.Disposable {
-    const handler = new ChatHandler(toolManager, resourceManager, context.extensionUri);
+    const handler = new ChatHandler(clients, context.extensionUri);
     return handler.register();
   }
 }

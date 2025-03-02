@@ -4,7 +4,6 @@ export enum ServerType {
 }
 
 export interface ServerConfig {
-    id: string;
     name: string;
     type?: ServerType;
     command?: string;

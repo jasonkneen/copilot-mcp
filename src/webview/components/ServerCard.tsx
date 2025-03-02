@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { 
-  ChevronDown, 
   ChevronRight, 
   Edit, 
-  MoreHorizontal, 
   Trash, 
   Terminal, 
   Globe, 
-  Server, 
-  Power,
   AlertCircle,
   Info, 
   Copy,
@@ -25,7 +21,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
   CardHeader,
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -35,13 +30,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -62,9 +50,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
 
-import { ServerConfig, ServerWithTools, ServerType, EnvVar } from "../types";
+import { ServerWithTools, ServerType, EnvVar } from "../types";
 
 type ServerCardProps = React.ComponentProps<typeof Card> & {
   server: ServerWithTools;
@@ -89,6 +76,10 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
   // Force rerenders when toggle is clicked
   const [localEnabled, setLocalEnabled] = useState(server.enabled);
 
+  const validateServerName = (name: string): boolean => {
+    return /^[a-zA-Z0-9_-]+$/.test(name);
+  };
+
   useEffect(() => {
     // Always keep local state in sync with server state
     setLocalEnabled(server.enabled);
@@ -111,7 +102,7 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
   }, [isEditing, server]);
 
   const handleToggleServer = (enabled: boolean) => {
-    console.log(`Toggling server ${server.id} to ${enabled ? 'enabled' : 'disabled'}`);
+    console.log(`Toggling server ${server.name} to ${enabled ? 'enabled' : 'disabled'}`);
     
     // Update local state immediately for responsive UI
     setLocalEnabled(enabled);
@@ -119,7 +110,7 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
     // Post message to VSCode extension
     window.vscodeApi.postMessage({
       type: 'toggleServer',
-      id: server.id,
+      name: server.name,
       enabled
     });
   };
@@ -127,7 +118,7 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
   const handleRemoveServer = () => {
     window.vscodeApi.postMessage({
       type: 'removeServer',
-      id: server.id
+      name: server.name
     });
     
     setShowDeleteConfirm(false);
@@ -150,6 +141,11 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
       return;
     }
 
+    if (!validateServerName(editName)) {
+      setFormError('Server name can only contain letters, numbers, dashes, and underscores');
+      return;
+    }
+
     if (editType === ServerType.PROCESS && !editCommand.trim()) {
       setFormError('Command is required for process servers');
       return;
@@ -162,7 +158,6 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
 
     // Create updates object based on server type
     let updates: any = {
-      id: server.id,
       name: editName.trim(),
       type: editType,
     };
@@ -260,9 +255,9 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
       
       <div className="space-y-3">
         <div className="space-y-2">
-          <Label htmlFor={`edit-name-${server.id}`}>Server Name</Label>
+          <Label htmlFor={`edit-name-${server.name}`}>Server Name</Label>
           <Input
-            id={`edit-name-${server.id}`}
+            id={`edit-name-${server.name}`}
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
             className="bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border-[var(--vscode-input-border)]"
@@ -275,22 +270,22 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
             <div className="flex items-center space-x-2">
               <input
                 type="radio"
-                id={`type-process-${server.id}`}
+                id={`type-process-${server.name}`}
                 checked={editType === ServerType.PROCESS}
                 onChange={() => setEditType(ServerType.PROCESS)}
                 className="accent-[var(--vscode-focusBorder)]"
               />
-              <Label htmlFor={`type-process-${server.id}`} className="cursor-pointer">Process (Local)</Label>
+              <Label htmlFor={`type-process-${server.name}`} className="cursor-pointer">Process (Local)</Label>
             </div>
             <div className="flex items-center space-x-2">
               <input
                 type="radio"
-                id={`type-sse-${server.id}`}
+                id={`type-sse-${server.name}`}
                 checked={editType === ServerType.SSE}
                 onChange={() => setEditType(ServerType.SSE)}
                 className="accent-[var(--vscode-focusBorder)]"
               />
-              <Label htmlFor={`type-sse-${server.id}`} className="cursor-pointer">SSE (Remote)</Label>
+              <Label htmlFor={`type-sse-${server.name}`} className="cursor-pointer">SSE (Remote)</Label>
             </div>
           </div>
         </div>
@@ -298,9 +293,9 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
         {editType === ServerType.PROCESS ? (
           <>
             <div className="space-y-2">
-              <Label htmlFor={`edit-command-${server.id}`}>Start Command</Label>
+              <Label htmlFor={`edit-command-${server.name}`}>Start Command</Label>
               <Input
-                id={`edit-command-${server.id}`}
+                id={`edit-command-${server.name}`}
                 value={editCommand}
                 onChange={(e) => setEditCommand(e.target.value)}
                 className="font-mono text-sm bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border-[var(--vscode-input-border)]"
@@ -355,9 +350,9 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
         ) : (
           <>
             <div className="space-y-2">
-              <Label htmlFor={`edit-url-${server.id}`}>Server URL</Label>
+              <Label htmlFor={`edit-url-${server.name}`}>Server URL</Label>
               <Input
-                id={`edit-url-${server.id}`}
+                id={`edit-url-${server.name}`}
                 value={editUrl}
                 onChange={(e) => setEditUrl(e.target.value)}
                 className="font-mono text-sm bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border-[var(--vscode-input-border)]"
@@ -365,9 +360,9 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor={`edit-auth-${server.id}`}>Authentication Token (Optional)</Label>
+              <Label htmlFor={`edit-auth-${server.name}`}>Authentication Token (Optional)</Label>
               <Input
-                id={`edit-auth-${server.id}`}
+                id={`edit-auth-${server.name}`}
                 type="password"
                 value={editAuthToken}
                 onChange={(e) => setEditAuthToken(e.target.value)}
@@ -509,27 +504,7 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
           
           {serverType === ServerType.PROCESS ? (
             <>
-              <span className="text-[var(--vscode-descriptionForeground)]">Command:</span>
-              <HoverCard>
-                <HoverCardTrigger asChild>
-                  <div className="group flex items-center gap-1 cursor-pointer">
-                    <code className="px-2 py-1 bg-[var(--vscode-editor-inactiveSelectionBackground)] rounded font-mono text-xs overflow-x-auto">
-                      {server.command}
-                    </code>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard(server.command || '', 'Command')}
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </HoverCardTrigger>
-                <HoverCardContent className="w-auto max-w-md">
-                  <p className="text-xs">Server start command</p>
-                </HoverCardContent>
-              </HoverCard>
+              
             </>
           ) : (
             <>

@@ -76,6 +76,7 @@ export class Logger {
      * Log a debug message
      */
     public debug(message: string): void {
+        console.debug(message);
         this._log(LogLevel.Debug, message);
     }
 
@@ -83,6 +84,7 @@ export class Logger {
      * Log an info message
      */
     public log(message: string): void {
+        console.log(message);
         this._log(LogLevel.Info, message);
     }
 
@@ -90,6 +92,7 @@ export class Logger {
      * Log a warning message
      */
     public warn(message: string): void {
+        console.warn(message);
         this._log(LogLevel.Warn, message);
     }
 
@@ -97,6 +100,7 @@ export class Logger {
      * Log an error message
      */
     public error(message: string): void {
+        console.error(message);
         this._log(LogLevel.Error, message);
     }
 
