@@ -1,28 +1,24 @@
 import * as vscode from 'vscode';
 import { Client as MCPClient } from "@modelcontextprotocol/sdk/client/index";
 import { CallToolRequest, Tool } from "@modelcontextprotocol/sdk/types";
-import { MCPClientManager } from '@automatalabs/mcp-client-manager';
 /**
  * A proxy tool that forwards calls to an MCP tool
  */
 export class McpProxyTool implements vscode.LanguageModelChatTool {
-    private _clientManager: MCPClientManager;
+    private _client: MCPClient;
     private _tool: Tool;
     public name: string;
     public inputSchema: Tool['inputSchema'];
     public description: string;
 
-    constructor(clientManager: MCPClientManager, tool: Tool) {
-        this._clientManager = clientManager;
+    constructor(client: MCPClient, tool: Tool) {
+        this._client = client;
         this._tool = tool;
         this.name = tool.name;
         this.inputSchema = tool.inputSchema;
         this.description = tool.description || '';
 
-        this._clientManager.on('error', (error) => {
-            console.error("MCP client error:", error);
-        });
-
+        // this._callTool = callTool;
     }
 
     private _handleNotification(notification: any): Promise<void> {
@@ -44,13 +40,13 @@ export class McpProxyTool implements vscode.LanguageModelChatTool {
             const payload: CallToolRequest["params"] = {
                 name: this._tool.name,
                 arguments: options.input,
-                _meta: {
-                	toolCallId: options.toolInvocationToken,
-                	progressToken: options.toolInvocationToken
-                }
+                // _meta: {
+                // 	toolCallId: options.toolInvocationToken,
+                // 	progressToken: options.toolInvocationToken
+                // }
             };
             console.log("CallToolRequest Params:", payload);
-            const result = await this._clientManager.callTool(this._tool.name, payload, );
+            const result = await this._client.callTool(payload);
             console.log("Tool result:", result);
             // Convert MCP result to LanguageModelToolResult
             let content: (vscode.LanguageModelTextPart | vscode.LanguageModelPromptTsxPart)[] = [];

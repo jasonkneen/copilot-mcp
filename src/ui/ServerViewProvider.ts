@@ -3,10 +3,9 @@ import { Logger } from '../utils/Logger';
 import { ErrorHandler } from '../utils/ErrorHandler';
 import { Tool, Resource } from '@modelcontextprotocol/sdk/types';
 import { EventBus } from '../utils/EventBus';
-import { ServerEventType, ServerType } from '../server/ServerConfig';
-import { MCPClientManager, Transport } from '@automatalabs/mcp-client-manager';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse';
+import { ServerConfig, ServerEventType, ServerType } from '../server/ServerConfig';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { installDynamicToolsExt } from '@/tools';
 /**
  * WebviewProvider for the MCP Server Manager UI
  */
@@ -22,7 +21,7 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
      */
     constructor(
         private readonly context: vscode.ExtensionContext,
-        private readonly clientManager: MCPClientManager
+        private clients: Client[]
     ) {
         try {
             this._logger = Logger.getInstance();
@@ -43,22 +42,21 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
         
         // Set up listeners for each event type
         const startedSubscription = eventBus.on(ServerEventType.SERVER_STARTED, (event: any) => {
-            this._updateServerState(event.serverId, { running: true });
+            console.debug('[EVENT] Server started: ', event);
         });
         
         const stoppedSubscription = eventBus.on(ServerEventType.SERVER_STOPPED, (event: any) => {
-            this._updateServerState(event.serverId, { running: false, tools: [] });
+            console.debug('[EVENT] Server stopped: ', event);
         });
         
         const toolsChangedSubscription = eventBus.on(ServerEventType.TOOLS_CHANGED, (event: any) => {
+            console.debug('[EVENT] Tools changed: ', event);
             if (event.data?.tools) {
-                this._updateServerState(event.serverId, { tools: event.data.tools });
             }
         });
         
         const resourcesChangedSubscription = eventBus.on(ServerEventType.RESOURCES_CHANGED, (event: any) => {
             if (event.data?.resources) {
-                this._updateServerState(event.serverId, { resources: event.data.resources });
             }
         });
         
@@ -113,48 +111,49 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
         }
 
         try {
-            const serverNames = this.clientManager.listServerNames();
-            
-            const servers = await serverNames.reduce(async (accPromise, server: string) => {
-                // Wait for previous promise to resolve
-                const acc = await accPromise;
+            const servers = [];
+            for(const client of this.clients) {
+                let isConnected = false;
+                try {
+                    const value = await client.ping();
+                    console.log('MCP Server Ping: ', value);
+                    isConnected = true;
+                } catch(e) {
+                    // console.warn(e);
+                    console.debug('MCP not connected', e);
+                    isConnected = false;
+                }
+                let tools: Tool[] = [];
+                try {
+                    const toolsResponse = await client.listTools();
+                    tools = [...toolsResponse.tools];
+                } catch(e) {
+                    console.warn(e);
+                    console.debug('Server tools not available', e);
+                }
                 
-                // get the info
-                const client = this.clientManager.getClientIdByServerName(server);
-                if (!client) {return acc;}
+                let resources: Resource[] = [];
+                try {
+                    const resourcesResponse = await client.listResources();
+                    resources = [...resourcesResponse.resources];
+                } catch(e) {
+                    console.debug(`Server resources not available for ${client.getServerVersion()?.name}`);
+                }
                 
-                const clientWrapper = this.clientManager.getClientInfo(client);
-                if (!clientWrapper) {return acc;}
+                const clientInfo = client.getServerVersion();
+                if(!clientInfo) {
+                    console.warn('Client info not available');
+                    
+                }
                 
-                // Get running servers from the server manager
-                const isRunning = this.clientManager.isClientHealthy(client);
-                
-                // Ensure tools and resources are properly included
-                const tools = await this.clientManager.getClientTools(client) || [];
-                const resources = await this.clientManager.getClientResources(client) || [];
-                
-                // Add valid server to accumulator
-                acc.push({
-                    id: client, // Add id field for referencing in updateServerTools
-                    name: server,
-                    running: isRunning,
-                    tools,
-                    resources
+                servers.push({
+                    // id: clientInfo?.name,
+                    name: clientInfo?.name,
+                    enabled: isConnected ?? false,
+                    tools: tools,
+                    resources: resources,
                 });
-                
-                return acc;
-            }, Promise.resolve([] as Array<{
-                id: string;
-                name: string;
-                running: boolean;
-                tools: Tool[];
-                resources: Resource[];
-            }>));
-
-            this._view.webview.postMessage({ 
-                type: 'setServers', 
-                servers: servers 
-            });
+            }
             
             // Send tools for each server separately after initial state
             // This ensures proper tool registration in the UI
@@ -162,64 +161,18 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                 if (server.tools && server.tools.length > 0) {
                     this._view.webview.postMessage({
                         type: 'updateServerTools',
-                        serverId: server.id,
-                        tools: server.tools
+                        name: server.name,
+                        tools: server.tools,
+                        enabled: server.enabled,
                     });
                 }
             }
+            this._view.webview.postMessage({ 
+                type: 'setServers', 
+                servers: servers 
+            });
         } catch (error) {
             ErrorHandler.handleError('Send Initial State', error);
-        }
-    }
-
-    /**
-     * Update the state of a server in the UI
-     * @param serverId The server ID
-     * @param state The updated state properties
-     */
-    private async _updateServerState(serverId: string, state: Partial<{
-        running: boolean;
-        tools: Tool[];
-        resources: Resource[];
-    }>): Promise<void> {
-        if (!this._view) {
-            return;
-        }
-
-        try {
-            const serverClient = this.clientManager.getClientInfo(serverId);
-            if (!serverClient) {
-                return;
-            }
-            
-            // Get the full server data with running state
-            const isRunning = this.clientManager.isClientHealthy(serverId);
-            
-            // Collect tools and resources from the server process if running
-            const tools = await this.clientManager.getClientTools(serverId) || [];
-            const resources = await this.clientManager.getClientResources(serverId) || [];
-            
-            // Send the complete updated server state
-            this._view.webview.postMessage({
-                type: 'updateServer',
-                server: {
-                    ...serverClient,
-                    running: state.running !== undefined ? state.running : isRunning,
-                    tools: tools,
-                    resources: resources
-                }
-            });
-            
-            // Also send tools update as a separate message to ensure UI registers them correctly
-            if (tools.length > 0) {
-                this._view.webview.postMessage({
-                    type: 'updateServerTools',
-                    serverId,
-                    tools
-                });
-            }
-        } catch (error) {
-            ErrorHandler.handleError('Update Server State', error);
         }
     }
 
@@ -254,27 +207,34 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                 
                 case 'addServer':
                     if (message.server) {
+                        console.log('Adding server: ', message.server);
                         const serverType = message.server.type || ServerType.PROCESS;
-                        let transport: Transport;
-                        if (serverType === ServerType.PROCESS) {
-                            transport = new StdioClientTransport({
-                                command: message.server.command,
-                                env: message.server.env
-                            });
-                        } else if(serverType === ServerType.SSE) {
-                            transport = new SSEClientTransport(message.server.url);
-                            
-                        } else {
-                            throw new Error(`Unsupported server type: ${serverType}`);
-                        }
-                        
-                        const client = await this.clientManager.addServer(transport, message.server.name, {
-                            authToken: message.server.authToken,
-                            env: message.server.env
+
+                        // const { cmd, args: actualArgs } = findActualExecutable(command, args);
+                        const client = await installDynamicToolsExt({
+                            context: this.context,
+                            serverName: message.server.name,
+                            command: message.server.command,
+                            env: {...(message.server.env ?? {})},
+                            transport: serverType === ServerType.PROCESS ? 'stdio' : 'sse',
+                            url: serverType === ServerType.SSE ? message.server.url : undefined
                         });
-                        
+                        this.clients.push(client);
+                       
+                        // const client = await this.clientManager.addServer(transport, message.server.name, message.server.command);
+                        const config = vscode.workspace.getConfiguration('mcpManager');
+                        const servers = config.get<ServerConfig[]>('servers', []);
+                        servers.push({
+                            name: message.server.name,
+                            command: message.server.command,
+                            type: serverType,
+                            // id: client.getServerVersion()?.name ?? message.server.name,
+                            enabled: true
+                        });
+                        config.update('servers', servers, vscode.ConfigurationTarget.Global);
                         await this._sendInitialState();
-                        
+                        this._logger?.log(`Has Name? ${client.getServerVersion()?.name}`);
+                        this._logger?.log(`Check VSCode Tools: ${JSON.stringify(vscode.lm.tools)}`);
                         if (this._logger) {
                             this._logger.log(`Added ${serverType} server: ${client}`);
                         }
@@ -282,41 +242,50 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                     break;
                 
                 case 'removeServer':
-                    if (message.id) {
-                        this.clientManager.removeClient(message.id);
+                    if (message.name) {
+                        console.log('Removing server: ', message.name);
+                        const client = this.clients.find(client => client.getServerVersion()?.name === message.name);
+                        if(client) {
+                            await client.close();
+                        }
+                        this.clients = this.clients.filter(client => client.getServerVersion()?.name !== message.name);
+                        const config = vscode.workspace.getConfiguration('mcpManager');
+                        const servers = config.get<ServerConfig[]>('servers', []);
+                        config.update('servers', servers.filter(server => server.name !== message.name), vscode.ConfigurationTarget.Global);
                         await this._sendInitialState();
                         
                         if (this._logger) {
-                            this._logger.log(`Removed server: ${message.id}`);
+                            this._logger.log(`Removed server: ${message.name}`);
                         }
                     }
                     break;
                 
                 case 'editServer':
-                    if (message.server && message.server.id) {
+                    if (message.server && message.server.name) {
                         throw new Error('Edit server not supported');
                     }
                     break;
                 
                 case 'toggleServer':
-                    if (message.id !== undefined) {
+                    if (message.name !== undefined) {
                         // Get running servers from the server manager
-                        const client = this.clientManager.getClientInfo(message.id);
+                        const client = this.clients.find(client => client.getServerVersion()?.name === message.name);
                         if (!client) {
                             return;
                         }
-                        const isRunning = this.clientManager.isClientHealthy(message.id);
+                        const isRunning = await client.ping();
                         if (!isRunning) {
                             // toggle the server on
-                            await this.clientManager.reconnectClient(message.id);
+                            console.log('Starting server: ', message.name);
+                            await client.transport?.start();
                             if (this._logger) {
-                                this._logger.log(`Started server: ${message.id}`);
+                                this._logger.log(`Started server: ${message.name}`);
                             }
                         } else {
                             // toggle the server off
-                            await this.clientManager.disconnectClient(message.id);
+                            await client.close();
                             if (this._logger) {
-                                this._logger.log(`Stopped server: ${message.id}`);
+                                this._logger.log(`Stopped server: ${message.name}`);
                             }
                         }
                         
@@ -459,9 +428,9 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
      */
     public static async createOrShow(
         context: vscode.ExtensionContext,
-        clientManager: MCPClientManager
+        clients: Client[]
     ): Promise<ServerViewProvider> {
-        const provider = new ServerViewProvider(context, clientManager);
+        const provider = new ServerViewProvider(context, clients);
         
         // Register the webview provider
         const provider_registration = vscode.window.registerWebviewViewProvider(

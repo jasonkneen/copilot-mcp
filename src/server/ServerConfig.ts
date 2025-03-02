@@ -17,8 +17,6 @@ export enum ServerType {
  * Represents the configuration for an MCP server
  */
 export interface ServerConfig {
-    /** Unique identifier for the server */
-    id: string;
     /** Display name for the server */
     name: string;
     /** Type of server - process or SSE */
@@ -69,8 +67,8 @@ export enum ServerEventType {
 export interface ServerEvent {
     /** Type of the event */
     type: ServerEventType;
-    /** ID of the server this event relates to */
-    serverId: string;
+    /** Name of the server this event relates to */
+    serverName: string;
     /** Additional event data */
     data?: any;
 }

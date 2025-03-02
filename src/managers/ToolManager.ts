@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { Client as MCPClient } from "@modelcontextprotocol/sdk/client/index";
 import { Tool } from "@modelcontextprotocol/sdk/types";
 import { McpProxyTool } from '../tools/McpProxyTool';
-import { MCPClientManager } from '@automatalabs/mcp-client-manager';
 
 /**
  * ToolManager handles registration and management of MCP tools
@@ -23,7 +22,7 @@ export class ToolManager {
      * @param tools The tools to register
      * @returns A promise that resolves when the tools are registered
      */
-    public async registerTools(serverId: string, client: MCPClientManager, tools: Tool[]): Promise<void> {
+    public async registerTools(serverId: string, client: MCPClient, tools: Tool[]): Promise<void> {
         try {
             const registrations: vscode.Disposable[] = [];
             const toolInstances: vscode.LanguageModelChatTool[] = [];
@@ -133,7 +132,7 @@ export class ToolManager {
      * @param client The MCP client
      * @param tools The updated tools
      */
-    public async refreshToolsForServer(serverId: string, client: MCPClientManager, tools: Tool[]): Promise<void> {
+    public async refreshToolsForServer(serverId: string, client: MCPClient, tools: Tool[]): Promise<void> {
         try {
             // First unregister existing tools
             this.unregisterTools(serverId);

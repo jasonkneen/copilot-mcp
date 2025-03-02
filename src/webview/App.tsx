@@ -42,15 +42,15 @@ const handleWebviewMessage = (event: MessageEvent) => {
     case 'updateServer':
       return (current: ServerWithTools[]) => 
         current.map(server => 
-          server.id === message.server.id 
-            ? { ...message.server, tools: message.tools || server.tools }
+          server.name === message.server.name 
+            ? { ...server, ...message.server, tools: message.tools || server.tools, enabled: message.running || server.enabled }
             : server
         );
     case 'updateServerTools':
       return (current: ServerWithTools[]) =>
         current.map(server =>
-          server.id === message.serverId
-            ? { ...server, tools: message.tools }
+          server.name === message.name
+            ? { ...server, tools: message.tools, enabled: message.running }
             : server
         );
     default:
@@ -285,7 +285,7 @@ export function App() {
                 <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
                   {filteredServers.map(server => (
                     <ServerCard
-                      key={server.id}
+                      key={server.name}
                       server={server}
                       onUpdate={() => {
                         toast.success("Server updated", {

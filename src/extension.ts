@@ -6,64 +6,46 @@ import { ChatHandler } from './chat/ChatHandler';
 import { Logger, LogLevel } from './utils/Logger';
 import { ErrorHandler } from './utils/ErrorHandler';
 import { ServerViewProvider } from './ui/ServerViewProvider';
-
-import { MCPClientManager, Transport } from '@automatalabs/mcp-client-manager';
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { ServerType } from './server/ServerConfig';
 import { ServerConfig } from './server/ServerConfig';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse';
-import { findActualExecutable } from 'spawn-rx';
+import { installDynamicToolsExt } from './tools';
 // This method is called when your extension is activated
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Starting activation of copilot-mcp extension...');
     
     try {
         // Initialize the logger for the extension
-        const logger = Logger.initialize(context, 'MCP Server Manager', LogLevel.Info);
+        const logger = Logger.initialize(context, 'MCP Server Manager', LogLevel.Debug);
         logger.log('Initializing extension...');
-        
-        // Initialize the MCP client manager
-        const mcpClientManager = new MCPClientManager();
-        logger.log('MCP client manager initialized');
 
         // Get servers from configuration
         const config = vscode.workspace.getConfiguration('mcpManager');
         const servers = config.get<ServerConfig[]>('servers', []);
-        const serverClients: string[] = [];
-        // Ensure all servers have a type (for backward compatibility)
-        for (const server of servers) {
-            // We need to split the command into the executable and the arguments
-            // Right now, `server.command` is the full command, including arguments
-            const [command, ...args] = server.command.split(' ');
-            const { cmd, args: actualArgs } = findActualExecutable(command, args);
-            logger.log(`Command: ${cmd}, Args: ${actualArgs}`);
-            if (!server.type) {
-                server.type = ServerType.PROCESS;
-            }
-            // Create the transport
-            let transport: Transport;
-            if (server.type === ServerType.PROCESS) {
-                transport = new StdioClientTransport({
-                    command: cmd,
-                    args: actualArgs,
-                    env: server.env ?? undefined,
-                    stderr: 'pipe'
-                });
-                const clientId = await mcpClientManager.addServer(transport, server.name);
-                console.log(`Server ${server.name} added with client ID ${clientId}`);
-                logger.log(`Server ${server.name} added with client ID ${clientId}`);
-                serverClients.push(clientId);
-            } else if (server.type === ServerType.SSE && server.url) {
-                transport = new SSEClientTransport(new URL(server.url), {  });
-                const clientId = await mcpClientManager.addServer(transport, server.name);
-                logger.log(`Server ${server.name} added with client ID ${clientId}`);
-                serverClients.push(clientId);
+        logger.log(`Servers: ${JSON.stringify(servers)}`);
+        const clients: Client[] = [];
+        for(const server of servers) {
+            logger.log(`Installing dynamic tools ext for server`);
+            const client = await installDynamicToolsExt({
+                context,
+                serverName: server.name.trim(),
+                command: server.command,
+                env: {...(server.env ?? {})},
+                transport: server.type === ServerType.PROCESS ? 'stdio' : 'sse',
+                url: server.type === ServerType.SSE ? server.url : undefined
+            });
+            clients.push(client);
+            const serverInfo = client.getServerVersion();
+            if(serverInfo && serverInfo.name) {
+                logger.log(`Server ${server.name} added with client ID ${serverInfo.name}`);
+            } else {
+                logger.warn(`Could NOT get server name for added server ${server.name}`);
             }
             
         }
-        
+
         // Register the WebView Provider using our ServerViewProvider class
-        const serverViewProvider = await ServerViewProvider.createOrShow(context, mcpClientManager);
+        const serverViewProvider = await ServerViewProvider.createOrShow(context, clients);
         logger.log('WebView provider registered');
         
         // Register the openServerManager command
@@ -71,13 +53,17 @@ export async function activate(context: vscode.ExtensionContext) {
             try {
                 await vscode.commands.executeCommand('workbench.view.extension.mcpServers');
             } catch (error) {
-                ErrorHandler.handleError('Open Server Manager', error);
+                logger.warn(`Failed to open server manager: ${error}`);
             }
         });
         context.subscriptions.push(openManagerCommand);
-        
+
         // Register the ChatHandler
-        const chatParticipant = ChatHandler.register(context, mcpClientManager);
+        const chatParticipant = ChatHandler.register(context, clients);
+
+            // Add disposables to extension context
+        // context.subscriptions.push(chatParticipant);
+        logger.log('MCP client manager initialized');
         
         // Add disposables to extension context
         context.subscriptions.push(
@@ -90,8 +76,9 @@ export async function activate(context: vscode.ExtensionContext) {
         logger.log('Extension activation complete');
         console.log('copilot-mcp extension activated successfully');
     } catch (error) {
-        ErrorHandler.handleError('Extension Activation', error);
-        console.error('Error during extension activation:', error);
+        // ErrorHandler.handleError('Extension Activation', error);
+        const logger = Logger.getInstance();
+        logger.debug(`Error during extension activation: ${error}`);
         vscode.window.showErrorMessage(`Failed to activate the extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
