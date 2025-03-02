@@ -13,7 +13,6 @@ import { installDynamicToolsExt } from './tools';
 // This method is called when your extension is activated
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Starting activation of copilot-mcp extension...');
-    
     try {
         // Initialize the logger for the extension
         const logger = Logger.initialize(context, 'MCP Server Manager', LogLevel.Debug);

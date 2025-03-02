@@ -74,6 +74,12 @@ export function App() {
     return /^[a-zA-Z0-9_-]+$/.test(name);
   };
 
+  const escapeCommand = (command: string): string => {
+    // Replace single quotes with escaped single quotes
+    // Replace double quotes with escaped double quotes
+    return command.replace(/'/g, "\\'").replace(/"/g, '\\"');
+  };
+
   useEffect(() => {
     // Listen for messages from the extension
     const messageHandler = (event: MessageEvent) => {
@@ -154,7 +160,7 @@ export function App() {
     };
 
     if (serverType === ServerType.PROCESS) {
-      serverConfig.command = serverCommand.trim();
+      serverConfig.command = escapeCommand(serverCommand.trim());
       // Only include env vars if there are actually keys defined
       if (Object.keys(env).length > 0) {
         serverConfig.env = env;

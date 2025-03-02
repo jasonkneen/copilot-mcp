@@ -80,6 +80,12 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
     return /^[a-zA-Z0-9_-]+$/.test(name);
   };
 
+  const escapeCommand = (command: string): string => {
+    // Replace single quotes with escaped single quotes
+    // Replace double quotes with escaped double quotes
+    return command.replace(/'/g, "\\'").replace(/"/g, '\\"');
+  };
+
   useEffect(() => {
     // Always keep local state in sync with server state
     setLocalEnabled(server.enabled);
@@ -174,7 +180,7 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
 
       updates = {
         ...updates,
-        command: editCommand.trim(),
+        command: escapeCommand(editCommand.trim()),
         env
       };
       

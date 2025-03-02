@@ -40,7 +40,8 @@ export async function installDynamicToolsExt(params: RegisterToolsParams) {
         command: pCmd,
         args: pArgs,
         env: env,
-        cwd: findCacheDirectory({name: 'mcp-manager'})
+        cwd: findCacheDirectory({name: 'mcp-manager'}),
+        stderr: "pipe" as const
     };
     let transport: Transport;
     // 2. create a client and transport
@@ -83,17 +84,19 @@ export async function installDynamicToolsExt(params: RegisterToolsParams) {
           capabilities: {
             prompts: {},
             resources: {},
-            tools: {}
+            tools: {},
+            roots: {},
+            sampling: {}
           }
         }
     );
     try {
         await client.connect(transport);
     } catch(e) {
-        logger.warn(`Failed to connect to client with error: ${e}\n${JSON.stringify(transportParams)}`);
-        throw new Error(`Failed to connect to client: ${e}`);
+        logger.log(`Failed to connect to server with error: ${e}\n${JSON.stringify(transportParams)}`);
+        throw new Error(`Failed to connect to server: ${e}`);
     }
-
+    
     // Get the tools from the client
     const toolsResponse = await client.listTools();
     if(toolsResponse.error) {
