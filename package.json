@@ -1,181 +1,113 @@
 {
-  "name": "copilot-mcp",
+  "name": "mcpsx-run",
   "author": {
-    "email": "vikash@automatalabs.io",
-    "name": "Vikash Loomba",
-    "url": "https://automatalabs.io"
+    "email": "jason@bouncingfish.com",
+    "name": "Jason Kneen",
+    "url": "https://bouncingfish.com"
   },
-  "publisher": "AutomataLabs",
+  "publisher": "jasonkneen",
+  "type": "module",
   "repository": {
-    "url": "https://github.com/vikashloomba/copilot-mcp",
+    "url": "https://github.com/jasonkneen/mcpsx",
     "type": "git"
   },
-  "displayName": "Copilot MCP",
-  "description": "VSCode extension that acts as a Model Context Protocol (MCP) client, enabling integration between MCP servers and GitHub Copilot Chat",
-  "version": "0.0.15",
+  "displayName": "mcpsx.run",
+  "description": "VSCode extension that acts as a Model Context Protocol (MCP) client, enabling integration between MCP servers and GitHub Copilot Chat and allows grouping and advanced MCP features.",
+  "version": "1.0.36",
   "icon": "logo.png",
   "engines": {
-    "vscode": "^1.97.0"
+    "vscode": "^1.96.0"
   },
-  "categories": [
-    "AI",
-    "Chat",
-    "Programming Languages",
-    "Education",
-    "Snippets",
-    "Testing"
+  "enabledApiProposals": [
+    "extensionRuntime"
   ],
-  "keywords": [
-    "chat-participant",
-    "copilot",
-    "copilot-mcp",
-    "chat-participant-utils",
-    "dev",
-    "mcp",
-    "openrouter",
-    "coding",
-    "agent",
-    "autonomous",
-    "chatgpt",
-    "sonnet",
-    "ai",
-    "llama"
+  "categories": [
+    "Other"
   ],
   "activationEvents": [
     "onStartupFinished"
   ],
-  "main": "./dist/extension.js",
+  "main": "./dist/extension.cjs",
   "extensionDependencies": [
     "github.copilot-chat"
   ],
   "contributes": {
     "chatParticipants": [
       {
-        "id": "copilot-mcp.mcp",
-        "fullName": "MCP Agent",
-        "name": "mcp",
-        "description": "Agent with access to Model Context Protocol (MCP) servers",
-        "isSticky": true,
-        "commands": [
-          {
-            "name": "listResources",
-            "description": "Retrieve resources from your MCP servers"
-          }
-        ]
+        "id": "mcpsx-run.studio",
+        "fullName": "mcpsx.run - MCP Management Studio",
+        "name": "mcps",
+        "description": "Run MCP Servers and tooling",
+        "isSticky": true
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "mcpServers",
-          "title": "MCP Servers",
+          "id": "mcpsx",
+          "title": "mcpsx.run",
           "icon": "resources/light/server.svg"
         }
       ]
     },
     "views": {
-      "mcpServers": [
+      "mcpsx": [
         {
+          "icon": "resources/light/server.svg",
           "type": "webview",
-          "id": "mcpServerManager",
-          "name": "Server Manager",
+          "id": "mcpsxServerView",
+          "name": "mcpsx.run",
+          "visibility": "visible"
+        },
+        {
+          "icon": "resources/light/server-instances.svg",
+          "type": "webview",
+          "id": "mcpsxInstancesView",
+          "name": "Server Instances",
           "visibility": "visible"
         }
       ]
     },
     "commands": [
       {
-        "command": "copilot-mcp.openServerManager",
-        "title": "Open MCP Server Manager"
-      },
-      {
-        "command": "copilot-mcp.migrateServerConfigurations",
-        "title": "Migrate MCP Server Configurations"
+        "command": "mcpsx-run.studio.openServerManager",
+        "title": "Open mcpsx.run"
       }
-    ],
-    "configuration": {
-      "title": "MCP Manager",
-      "properties": {
-        "mcpManager.servers": {
-          "type": "array",
-          "default": [],
-          "description": "List of configured MCP servers",
-          "items": {
-            "type": "object",
-            "required": [
-              "name",
-              "enabled"
-            ],
-            "properties": {
-              "name": {
-                "type": "string",
-                "description": "Display name for the server"
-              },
-              "type": {
-                "type": "string",
-                "enum": [
-                  "process",
-                  "sse"
-                ],
-                "default": "process",
-                "description": "Type of MCP server: process (local command) or SSE (remote server)"
-              },
-              "command": {
-                "type": "string",
-                "description": "Command to start the server (for process servers)"
-              },
-              "args": {
-                "type": "array",
-                "description": "Arguments for the server command",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "url": {
-                "type": "string",
-                "description": "URL for SSE server connection (for SSE servers)"
-              },
-              "authToken": {
-                "type": "string",
-                "description": "Authentication token for SSE server (for SSE servers)"
-              },
-              "enabled": {
-                "type": "boolean",
-                "description": "Whether the server is enabled"
-              },
-              "env": {
-                "type": "object",
-                "description": "Environment variables for the server process (for process servers)",
-                "additionalProperties": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+    ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run package",
-    "compile": "webpack",
-    "watch": "webpack --watch",
-    "package": "webpack --mode production --devtool hidden-source-map",
+    "vscode:prepublish": "npm run update-version:production && npm run package",
+    "compile": "webpack --config webpack.config.cjs",
+    "watch": "webpack --watch --config webpack.config.cjs",
+    "package": "webpack --config webpack.config.cjs",
+    "package:production": "webpack --mode production --devtool hidden-source-map --config webpack.config.cjs",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test",
-    "deploy": "vsce publish",
-    "package-extension": "vsce package"
+    "deploy": "npm run update-version:production && npm run package:production && vsce publish --allow-proposed-apis extensionRuntime",
+    "package-extension": "npm run package && vsce package --no-dependencies",
+    "package-extension:production": "npm run package:production && vsce package --no-dependencies",
+    "dev": "code --extensionDevelopmentPath=${PWD} --enable-proposed-api=jasonkneen.copilot-mcpsx",
+    "update-version": "node update-version.cjs",
+    "update-version:production": "node update-version.cjs --production",
+    "update-version:minor": "node update-version.cjs minor",
+    "update-version:major": "node update-version.cjs major",
+    "update-version:minor:production": "node update-version.cjs --production minor",
+    "update-version:major:production": "node update-version.cjs --production major",
+    "install-cli": "node cli/install-dev.js",
+    "cli": "mcpsx"
   },
   "devDependencies": {
+    "@types/archiver": "^6.0.3",
+    "@types/express": "^5.0.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.17.19",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
-    "@types/shell-quote": "^1.7.5",
-    "@types/vscode": "^1.97.0",
+    "@types/uuid": "^10.0.0",
+    "@types/vscode": "^1.96.0",
     "@typescript-eslint/eslint-plugin": "^8.22.0",
     "@typescript-eslint/parser": "^8.22.0",
     "@vscode/test-cli": "^0.0.10",
@@ -194,7 +126,7 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.6.1",
+    "@modelcontextprotocol/sdk": "^1.5.0",
     "@radix-ui/react-collapsible": "^1.1.3",
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-dropdown-menu": "^2.1.6",
@@ -208,17 +140,28 @@
     "@tailwindcss/postcss": "^4.0.6",
     "@vscode/chat-extension-utils": "^0.0.0-alpha.5",
     "@vscode/prompt-tsx": "^0.3.0-alpha.19",
+    "archiver": "^7.0.1",
+    "body-parser": "^2.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "find-cache-dir": "^5.0.0",
     "lucide-react": "^0.475.0",
-    "next-themes": "^0.4.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "shell-quote": "^1.8.2",
     "sonner": "^2.0.1",
     "spawn-rx": "^5.1.2",
     "tailwind-merge": "^3.0.1",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "uuid": "^11.1.0"
+  },
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "@vscode/vsce-sign",
+      "keytar"
+    ],
+    "onlyBuiltDependencies": [
+      "@vscode/vsce-sign",
+      "keytar"
+    ]
   }
 }

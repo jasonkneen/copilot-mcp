@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap');
 @import 'tailwindcss';
 
 @plugin 'tailwindcss-animate';
@@ -56,51 +57,64 @@
 }
 
 :root {
-  --background: hsl(224 71% 4%);
-  --foreground: hsl(213 31% 91%);
-  --muted: hsl(223 47% 11%);
-  --muted-foreground: hsl(215.4 16.3% 56.9%);
-  --accent: hsl(216 34% 17%);
-  --accent-foreground: hsl(210 40% 98%);
-  --popover: hsl(224 71% 4%);
-  --popover-foreground: hsl(215 20.2% 65.1%);
-  --border: hsl(216 34% 17%);
-  --input: hsl(216 34% 17%);
-  --card: hsl(224 71% 4%);
-  --card-foreground: hsl(213 31% 91%);
-  --primary: hsl(210 40% 98%);
-  --primary-foreground: hsl(222.2 47.4% 1.2%);
-  --secondary: hsl(222.2 47.4% 11.2%);
-  --secondary-foreground: hsl(210 40% 98%);
-  --destructive: hsl(0 63% 31%);
-  --destructive-foreground: hsl(210 40% 98%);
-  --ring: hsl(216 34% 17%);
+  /* VS Code inspired color palette */
+  --background: hsl(220, 13%, 18%);
+  --foreground: hsl(0, 0%, 95%);
+  --muted: hsl(220, 13%, 22%);
+  --muted-foreground: hsl(215, 16%, 70%);
+  --accent: hsl(210, 13%, 25%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --popover: hsl(220, 13%, 18%);
+  --popover-foreground: hsl(215, 20%, 75%);
+  --border: hsl(220, 13%, 25%);
+  --input: hsl(220, 13%, 25%);
+  --card: hsl(220, 13%, 20%);
+  --card-foreground: hsl(0, 0%, 95%);
+  --primary: hsl(210, 100%, 50%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(220, 13%, 25%);
+  --secondary-foreground: hsl(0, 0%, 95%);
+  --destructive: hsl(0, 70%, 50%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --ring: hsl(210, 100%, 50%);
+  --radius: 0.5rem;
+  
+  /* Dark steel appearance */
+  --steel: hsl(220, 8%, 15%);
+  --steel-hover: hsl(220, 8%, 20%);
+  --steel-text: hsl(0, 0%, 85%);
+  --steel-accent: hsl(220, 15%, 30%);
 }
 
 .dark {
-  --background: hsl(224 71% 4%);
-  --foreground: hsl(213 31% 91%);
-  --muted: hsl(223 47% 11%);
-  --muted-foreground: hsl(215.4 16.3% 56.9%);
-  --accent: hsl(216 34% 17%);
-  --accent-foreground: hsl(210 40% 98%);
-  --popover: hsl(224 71% 4%);
-  --popover-foreground: hsl(215 20.2% 65.1%);
-  --border: hsl(216 34% 17%);
-  --input: hsl(216 34% 17%);
-  --card: hsl(224 71% 4%);
-  --card-foreground: hsl(213 31% 91%);
-  --primary: hsl(210 40% 98%);
-  --primary-foreground: hsl(222.2 47.4% 1.2%);
-  --secondary: hsl(222.2 47.4% 11.2%);
-  --secondary-foreground: hsl(210 40% 98%);
-  --destructive: hsl(0 63% 31%);
-  --destructive-foreground: hsl(210 40% 98%);
-  --ring: hsl(216 34% 17%);
-}
-
-@layer base {
-
+  /* VS Code inspired color palette */
+  --background: hsl(220, 13%, 18%);
+  --foreground: hsl(0, 0%, 95%);
+  --muted: hsl(220, 13%, 22%);
+  --muted-foreground: hsl(215, 16%, 70%);
+  --accent: hsl(210, 13%, 25%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --popover: hsl(220, 13%, 18%);
+  --popover-foreground: hsl(215, 20%, 75%);
+  --border: hsl(220, 13%, 25%);
+  --input: hsl(220, 13%, 25%);
+  --card: hsl(220, 13%, 20%);
+  --card-foreground: hsl(0, 0%, 95%);
+  --primary: hsl(210, 100%, 50%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(220, 13%, 25%);
+  --secondary-foreground: hsl(0, 0%, 95%);
+  --destructive: hsl(0, 70%, 50%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --ring: hsl(210, 100%, 50%);
+  --radius: 0.5rem;
+  
+  /* Dark steel appearance */
+  --steel: hsl(220, 8%, 15%);
+  --steel-hover: hsl(220, 8%, 20%);
+  --steel-text: hsl(0, 0%, 85%);
+  --steel-accent: hsl(220, 15%, 30%);
+  
 }
 
 @layer base {
@@ -112,15 +126,231 @@
   }
 }
 
-/*
-  ---break---
-*/
+/* VS Code specific styling */
+.vs-panel {
+  @apply border border-border/2 bg-card shadow-sm rounded-md;
+}
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
+.vs-header {
+  @apply border-b border-border/30;
+}
+
+.vs-content {
+  @apply bg-card/80;
+}
+
+.vs-button {
+  @apply transition-colors focus:outline-none focus:ring-1 focus:ring-primary/50 rounded-md;
+}
+
+.tool-item {
+  @apply hover:bg-accent/50 transition-colors rounded-md;
+}
+
+.tool-item-active {
+  @apply bg-accent/30 text-primary;
+}
+
+/* Animations */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
   }
-  body {
-    @apply bg-background text-foreground;
+  to {
+    opacity: 1;
+  }
+}
+
+/* Collapsible animations */
+@keyframes collapsibleDown {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+  }
+}
+
+@keyframes collapsibleUp {
+  from {
+    height: var(--radix-collapsible-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+.animate-collapsible-down {
+  animation: collapsibleDown 0.2s ease-out;
+}
+
+.animate-collapsible-up {
+  animation: collapsibleUp 0.2s ease-out;
+}
+
+/* Switch animations */
+@keyframes switchThumbOn {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+/* Dark steel theme enhancements */
+.steel-card {
+  border-color: hsl(220, 10%, 22%) !important;
+  background: linear-gradient(to bottom, hsl(220, 8%, 17%), hsl(220, 8%, 15%)) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
+.dark-border {
+  border-color: hsl(220, 10%, 22%) !important;
+}
+
+.dark-steel-button {
+  background-color: hsl(220, 8%, 20%) !important;
+  color: hsl(0, 0%, 85%) !important;
+  border-color: hsl(220, 10%, 25%) !important;
+}
+
+.dark-steel-button:hover {
+  background-color: hsl(220, 8%, 25%) !important;
+}
+
+.dark-steel-badge {
+  background-color: hsl(220, 15%, 25%) !important;
+  color: hsl(0, 0%, 85%) !important;
+  border-color: hsl(220, 15%, 30%) !important;
+}
+
+@keyframes switchThumbOff {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+[data-state=checked] .switch-thumb {
+  animation: switchThumbOn 0.3s ease-in-out;
+}
+
+[data-state=unchecked] .switch-thumb {
+  animation: switchThumbOff 0.3s ease-in-out;
+}
+
+/* Flat styling */
+.tool-header {
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--vscode-widget-border);
+  transition: all 0.2s ease;
+}
+
+.tool-header:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+/* Card styling */
+.steel-card {
+  background: var(--card);
+  border: 1px solid rgba(30, 34, 42, 0.8);
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.steel-card:hover {
+  border-color: var(--steel-accent);
+}
+
+/* Responsive utilities */
+@media (max-width: 640px) {
+  .responsive-container {
+    width: 100%;
+    min-width: 320px;
+    padding: 0.5rem;
+  }
+  
+  .responsive-text {
+    font-size: 0.875rem;
+  }
+  
+  .dialog-responsive {
+    width: 95vw !important;
+    max-width: none !important;
+  }
+  
+  .server-card-container {
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .responsive-container {
+    width: 100%;
+    max-width: 900px;
+    padding: 1rem;
+  }
+  
+  .dialog-responsive {
+    width: 85vw !important;
+    max-width: 600px !important;
+  }
+  
+  .server-card-container {
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 1025px) {
+  .responsive-container {
+    width: 100%;
+    max-width: 1200px;
+    padding: 1.5rem;
+  }
+  
+  .dialog-responsive {
+    width: 60vw !important;
+    max-width: 700px !important;
+  }
+  
+  .server-card-container {
+    gap: 1.25rem;
+  }
+}
+
+/* Media queries for viewport-based scaling */
+@media screen and (max-width: 480px) {
+  html {
+    font-size: 14px;
+  }
+  
+  .card-header {
+    padding: 0.75rem !important;
+  }
+  
+  .responsive-icon {
+    transform: scale(0.85);
+  }
+}
+
+@media screen and (min-width: 481px) and (max-width: 768px) {
+  html {
+    font-size: 15px;
+  }
+  
+  .card-header {
+    padding: 0.875rem !important;
+  }
+}
+
+@media screen and (min-width: 769px) {
+  html {
+    font-size: 16px;
   }
 }

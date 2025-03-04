@@ -15,9 +15,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "group toast group-[.toaster]:bg-[var(--vscode-editor-background)] group-[.toaster]:text-[var(--vscode-editor-foreground)] group-[.toaster]:border-[var(--vscode-widget-border)] group-[.toaster]:shadow-lg",
           description: "group-[.toast]:text-[var(--vscode-descriptionForeground)]",
           actionButton:
-            "group-[.toast]:bg-[var(--vscode-button-background)] group-[.toast]:text-[var(--vscode-button-foreground)] font-medium",
+            "group-[.toast]:bg-[var(--steel)] group-[.toast]:text-[var(--steel-text)] font-medium",
           cancelButton:
-            "group-[.toast]:bg-[var(--vscode-button-secondaryBackground)] group-[.toast]:text-[var(--vscode-button-secondaryForeground)] font-medium",
+            "group-[.toast]:bg-[var(--steel-hover)] group-[.toast]:text-[var(--steel-text)] font-medium",
           success: 
             "group-[.toast]:text-[var(--vscode-debugIcon-startForeground)] group-[.toast]:border-[var(--vscode-debugIcon-startForeground)]",
           error:

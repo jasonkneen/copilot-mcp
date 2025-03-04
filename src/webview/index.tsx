@@ -44,8 +44,15 @@ function renderApp() {
         console.log('Debug: Rendering test div');
         
         try {
-            root.render(<div>React is working!</div>);
-            console.log('Debug: Test render complete');
+            root.render(
+                <div className="flex flex-col items-center justify-center h-full p-4">
+                    <div className="animate-pulse text-center">
+                        <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent mb-3"></div>
+                        <p>Loading mcpsx-run...</p>
+                    </div>
+                </div>
+            );
+            console.log('Debug: Initial loading render complete');
 
             // If that works, render the actual app
             setTimeout(() => {
@@ -60,7 +67,7 @@ function renderApp() {
                 } catch (error: unknown) {
                     console.error('Debug: Error rendering App:', error);
                 }
-            }, 1000);
+            }, 500);
         } catch (error: unknown) {
             console.error('Debug: Error in initial render:', error);
         }
@@ -69,7 +76,10 @@ function renderApp() {
         // Try to show the error in the UI
         const container = document.getElementById('root');
         if (container && error instanceof Error) {
-            container.innerHTML = `<div style="color: red;">Error: ${error.message}</div>`;
+            const errorRoot = createRoot(container);
+            errorRoot.render(
+                <div style={{ color: 'red' }}>Error: {error.message}</div>
+            );
         }
     }
 }

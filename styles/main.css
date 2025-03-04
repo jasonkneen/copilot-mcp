@@ -1,0 +1,193 @@
+/* Replace harsh green backgrounds with subtle gradients or softer colors */
+.mcp-item {
+  background-color: rgba(248, 250, 252, 0.6); /* Even lighter background */
+  border: 1px solid rgba(226, 232, 240, 0.6); /* More subtle border */
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+  margin-bottom: 12px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.mcp-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.06);
+  border-color: rgba(56, 161, 105, 0.2);
+}
+
+/* Add subtle indicator on hover */
+.mcp-item::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 0;
+  background: linear-gradient(to bottom, var(--primary-color), transparent);
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+.mcp-item:hover::after {
+  height: 100%;
+  opacity: 0.6;
+}
+
+/* More professional typography */
+.mcp-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.mcp-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+/* Modern, subtle color scheme */
+:root {
+  --primary-color: #2f855a; /* Slightly darker green for better contrast */
+  --primary-light: rgba(56, 161, 105, 0.08);
+  --text-primary: #2d3748;
+  --text-secondary: #718096;
+  --background-color: #f8fafc;
+  --steel-accent: #2f855a;
+  --steel-text: #f0fff4;
+  --steel-hover: #38a169;
+}
+
+/* List container with better spacing */
+.mcp-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  padding: 20px;
+}
+
+/* Buttons and interactive elements */
+.mcp-button {
+  background-color: white;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  letter-spacing: -0.01em;
+}
+
+.mcp-button:hover {
+  background-color: var(--primary-light);
+  transform: translateY(-1px);
+}
+
+.mcp-button.primary {
+  background-color: var(--primary-color);
+  color: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.mcp-button.primary:hover {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Status indicators */
+.mcp-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: var(--primary-light);
+  color: var(--primary-color);
+}
+
+/* Card styling for ServerCard component */
+.steel-card {
+  background: linear-gradient(to bottom, rgba(255,255,255,0.05), transparent);
+  border-radius: 8px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s ease;
+}
+
+.steel-card:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.06);
+  border-color: rgba(226, 232, 240, 1);
+}
+
+/* Animations */
+.animate-fade-in {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Card hover effect */
+.card-hover-effect {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover-effect:hover {
+  transform: translateY(-2px);
+}
+
+/* Switch styling improvements */
+.switch-thumb[data-state="checked"] {
+  background: white;
+}
+
+/* Form controls */
+input.vs-input {
+  transition: border-color 0.15s ease;
+  background: rgba(248, 250, 252, 0.8);
+}
+
+input.vs-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+/* Badge enhancements */
+.vs-badge {
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* Collapsible sections */
+.vs-header {
+  transition: background-color 0.2s ease;
+}
+
+.vs-content {
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Tool sections */
+.tool-item {
+  border-left: 2px solid transparent;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+  padding-left: 8px;
+  margin-left: -10px;
+}
+
+.tool-item:hover {
+  border-left-color: var(--primary-color);
+  background-color: var(--primary-light);
+} 

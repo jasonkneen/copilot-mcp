@@ -17,6 +17,8 @@ export enum ServerType {
  * Represents the configuration for an MCP server
  */
 export interface ServerConfig {
+    /** Unique identifier for the server */
+    id: string;
     /** Display name for the server */
     name: string;
     /** Type of server - process or SSE */
@@ -33,6 +35,19 @@ export interface ServerConfig {
     env?: { [key: string]: string };
     /** Authentication token for SSE servers */
     authToken?: string;
+    /** Chat participant configuration */
+    chatParticipant?: {
+        /** Whether to create a chat participant for this server */
+        enabled: boolean;
+        /** Display name for the chat participant */
+        name?: string;
+        /** Short name for the chat participant */
+        shortName?: string;
+        /** Description for the chat participant */
+        description?: string;
+        /** Whether the chat participant should be sticky */
+        isSticky?: boolean;
+    };
 }
 
 /**

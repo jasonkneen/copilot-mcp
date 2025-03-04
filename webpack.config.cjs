@@ -4,6 +4,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const TerserPlugin = require('terser-webpack-plugin');
 
 // Check if the CJS files exist
 const sdkPath = path.resolve(__dirname, 'node_modules/@modelcontextprotocol/sdk');
@@ -25,13 +26,13 @@ const typesPath = fs.existsSync(cjsTypesPath)
 /** @type WebpackConfig */
 const extensionConfig = {
   target: 'node', // VS Code extensions run in a Node.js-context 📖 -> https://webpack.js.org/configuration/node/
-	mode: 'none', // this leaves the source code as close as possible to the original (when packaging we set this to 'production')
+	mode: 'development', // Set to development mode to disable optimizations
 
   entry: './src/extension.ts', // the entry point of this extension, 📖 -> https://webpack.js.org/configuration/entry-context/
   output: {
     // the bundle is stored in the 'dist' folder (check package.json), 📖 -> https://webpack.js.org/configuration/output/
     path: path.resolve(__dirname, 'dist'),
-    filename: 'extension.js',
+    filename: 'extension.cjs',
     libraryTarget: 'commonjs2'
   },
   externals: {
@@ -61,9 +62,12 @@ const extensionConfig = {
       }
     ]
   },
-  devtool: 'nosources-source-map',
+  devtool: 'source-map',
   infrastructureLogging: {
     level: "log", // enables logging required for problem matchers
+  },
+  optimization: {
+    minimize: false, // Disable minification completely
   },
 };
 
@@ -117,8 +121,62 @@ const webviewConfig = {
     hints: false
   },
   optimization: {
-    minimize: false
+    minimize: false, // Disable minification completely
   }
 };
 
-module.exports = [ extensionConfig, webviewConfig ];
+// Configuration for the instances panel webview
+const instancesWebviewConfig = {
+  target: 'web',
+  mode: 'development',
+  entry: './src/webview/instancesWebview.tsx',
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: 'instancesWebview.js',
+    library: {
+      type: 'module'
+    }
+  },
+  experiments: {
+    outputModule: true
+  },
+  devtool: 'source-map',
+  resolve: {
+    extensions: ['.ts', '.tsx', '.js', '.jsx'],
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+      '@modelcontextprotocol/sdk/client/index': clientPath,
+      '@modelcontextprotocol/sdk/types': typesPath
+    }
+  },
+  module: {
+    rules: [
+      {
+        test: /\.tsx?$/,
+        exclude: /node_modules/,
+        use: [
+          {
+            loader: 'ts-loader',
+            options: {
+              compilerOptions: {
+                module: 'esnext'
+              }
+            }
+          }
+        ]
+      },
+      {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader', 'postcss-loader']
+      }
+    ]
+  },
+  performance: {
+    hints: false
+  },
+  optimization: {
+    minimize: false, // Disable minification completely
+  }
+};
+
+module.exports = [ extensionConfig, webviewConfig, instancesWebviewConfig ];

@@ -9,25 +9,39 @@ const Switch = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SwitchPrimitives.Root
     className={cn(
-      "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--vscode-focusBorder)] focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
-      props.checked 
-        ? "bg-[var(--vscode-inputOption-activeBackground)]" 
-        : "bg-[var(--vscode-input-background)]",
+      "peer relative inline-flex h-4 w-8 shrink-0 cursor-pointer items-center rounded-full transition-all duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 overflow-hidden",
+      "border-0 data-[state=checked]:border-0 data-[state=unchecked]:border-0",
       className
     )}
     {...props}
     ref={ref}
   >
+    {/* Track background with flat styling */}
+    <span 
+      className="absolute inset-0 rounded-full" 
+      data-state={props.checked ? "checked" : "unchecked"}
+      style={{
+        background: props.checked 
+          ? 'var(--green-500, #10b981)' // Default to green with fallback
+          : 'hsl(220, 13%, 25%)',
+        border: '1px solid rgba(0, 0, 0, 0.2)'
+      }}
+    />
+    
+    {/* Sliding thumb with flat styling */}
     <SwitchPrimitives.Thumb
       className={cn(
-        "pointer-events-none block h-4 w-4 rounded-full shadow-lg ring-0 transition-transform duration-100",
-        "bg-[var(--vscode-editor-background)]",
-        props.checked ? "translate-x-4" : "translate-x-0"
+        "pointer-events-none absolute z-10 block h-3 w-3 rounded-full transition-all duration-300 ease-in-out",
+        "data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0.5",
+        "switch-thumb"
       )}
+      style={{
+        background: 'hsl(0, 0%, 95%)',
+        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)'
+      }}
     />
   </SwitchPrimitives.Root>
 ))
-
 Switch.displayName = SwitchPrimitives.Root.displayName
 
 export { Switch }
