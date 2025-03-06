@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { sendChatParticipantRequest } from '@vscode/chat-extension-utils';
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { NamedClient } from '@/tools';
 /**
  * Handles chat functionality for MCP integration by providing
  * chat handling and followup capabilities
@@ -8,7 +9,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 export class ChatHandler implements vscode.ChatFollowupProvider {
   private _participant?: vscode.ChatParticipant;
   private _logoPath: vscode.Uri;
-  private _clients: Client[];
+  private _clients: NamedClient[];
 
   /**
    * Creates a new chat handler
@@ -17,7 +18,7 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
    * @param extensionUri The extension URI
    */
   constructor(
-    private readonly clients: Client[],
+    private readonly clients: NamedClient[],
     private readonly extensionUri: vscode.ExtensionContext['extensionUri']
   ) {
     console.log('ChatHandler initialized');
@@ -48,14 +49,27 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
       if (request.command === 'listResources') {
         return this._handleListResourcesCommand(stream);
       }
-      
       // Get all available tools from the tool manager
       // const allTools = await this.mcpClientManager.listTools();
       const tools = vscode.lm.tools.filter(tool => tool.tags?.includes('mcpManager'));
-      
+      // get all the previous participant messages
+      const messages = [];
+      const previousMessages = context.history.filter(
+        h => h instanceof vscode.ChatResponseTurn
+      );
+      // add the previous messages to the messages array
+      previousMessages.forEach(m => {
+        let fullMessage = '';
+        m.response.forEach(r => {
+          const mdPart = r as vscode.ChatResponseMarkdownPart;
+          fullMessage += mdPart.value.value;
+        });
+        messages.push(vscode.LanguageModelChatMessage.Assistant(fullMessage));
+      });
+
 
       console.log("Available tools:", tools.length);
-      
+
       // Forward the request to VS Code's chat system with our tools
       const chatResult = sendChatParticipantRequest(request, context, {
         prompt: `
@@ -67,22 +81,34 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
           references: true,
           responseText: true,
         },
-        tools: tools
+        tools: tools,
+
       }, token);
       stream.progress(
         "Thinking..."
       );
-      const result = chatResult.result;
-
-      return await result;
+      const result = await chatResult.result;
+      console.log("Result:", result);
+      if (result.errorDetails) {
+        stream.push(new vscode.ChatResponseMarkdownPart(
+          new vscode.MarkdownString(`I encountered an error: ${result.errorDetails}`)
+        ));
+        return {
+          metadata: {
+            command: 'error',
+            error: result.errorDetails
+          }
+        };
+      }
+      return result;
     } catch (error) {
       console.error('Error handling chat request:', error);
-      
+
       // Return a fallback response
       stream.push(new vscode.ChatResponseMarkdownPart(
         new vscode.MarkdownString(`I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`)
       ));
-      
+
       return {};
     }
   }
@@ -121,29 +147,29 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
   ): Promise<vscode.ChatResult> {
     // Get resources from the resource manager
     const resources = [];
-    for(const client of this._clients) {
+    for (const client of this._clients) {
       try {
         const resourcesResponse = await client.listResources();
         resources.push(...resourcesResponse.resources);
-      } catch(e) {
+      } catch (e) {
         console.warn(`Failed to list resources for client ${client.getServerVersion()?.name}:`);
       }
     }
-      
+
     if (resources.length === 0) {
       stream.push(new vscode.ChatResponseMarkdownPart(
         new vscode.MarkdownString("No resources found")
       ));
       return {};
     }
-    
+
     const markdown = new vscode.MarkdownString();
     markdown.supportHtml = true;
     markdown.appendMarkdown(`<h2>Resources</h2>`);
-    
+
     for (const resource of resources) {
       markdown.appendMarkdown(`<strong>${resource.name}:</strong>`);
-      
+
       // Display appropriate resource info based on its type
       if (resource.mimeType === 'text/plain' && resource.text) {
         markdown.appendMarkdown(`<p>${resource.text}</p>`);
@@ -157,13 +183,13 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
       } else {
         markdown.appendMarkdown(`<p>Type: ${resource.mimeType || 'unknown'}</p>`);
       }
-      
+
       markdown.appendMarkdown(`<p>URI: ${resource.uri}</p>`);
       markdown.appendMarkdown('<hr>');
     }
-    
+
     stream.push(new vscode.ChatResponseMarkdownPart(markdown));
-    
+
     return {
       metadata: {
         command: 'readResource'
@@ -178,19 +204,19 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
   public register(): vscode.Disposable {
     // Create the chat participant with a handler function
     const participant = vscode.chat.createChatParticipant(
-      'copilot-mcp.mcp', 
+      'copilot-mcp.mcp',
       (request, context, stream, token) => this.handleRequest(request, context, stream, token)
     );
-    
+
     // Set followup provider (this class implements the interface)
     participant.followupProvider = this;
-    
+
     // Set icon path
     participant.iconPath = this._logoPath;
-    
+
     // Store the participant reference
     this._participant = participant;
-    
+
     return participant;
   }
 
@@ -203,7 +229,7 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
    */
   public static register(
     context: vscode.ExtensionContext,
-    clients: Client[]
+    clients: NamedClient[]
   ): vscode.Disposable {
     const handler = new ChatHandler(clients, context.extensionUri);
     return handler.register();

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { Client as MCPClient } from "@modelcontextprotocol/sdk/client/index";
-import { CallToolRequest, Tool } from "@modelcontextprotocol/sdk/types";
+import { CallToolRequest, Tool, CallToolResultSchema } from "@modelcontextprotocol/sdk/types";
 /**
  * A proxy tool that forwards calls to an MCP tool
  */
@@ -48,6 +48,19 @@ export class McpProxyTool implements vscode.LanguageModelChatTool {
             console.log("CallToolRequest Params:", payload);
             const result = await this._client.callTool(payload);
             console.log("Tool result:", result);
+            // Parse the CallToolResponse
+            const parsedResult = CallToolResultSchema.parse(result);
+
+
+            if (parsedResult.isError) {
+                if (parsedResult.content.every(c => c.type === 'text')) {
+                    const errorMessageFromContent = parsedResult.content.find(c => c.type === 'text')?.text;
+                    if (errorMessageFromContent) {
+                        return new vscode.LanguageModelToolResult([new vscode.LanguageModelTextPart(errorMessageFromContent)]);
+                    }
+                }
+                return new vscode.LanguageModelToolResult([new vscode.LanguageModelTextPart('An error occurred while calling the tool. Please try again.')]);
+            }
             // Convert MCP result to LanguageModelToolResult
             let content: (vscode.LanguageModelTextPart | vscode.LanguageModelPromptTsxPart)[] = [];
             if (Array.isArray(result.content)) {

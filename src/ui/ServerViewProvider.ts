@@ -5,7 +5,7 @@ import { Tool, Resource } from '@modelcontextprotocol/sdk/types';
 import { EventBus } from '../utils/EventBus';
 import { ServerConfig, ServerEventType, ServerType } from '../server/ServerConfig';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { installDynamicToolsExt } from '@/tools';
+import { installDynamicToolsExt, NamedClient } from '@/tools';
 /**
  * WebviewProvider for the MCP Server Manager UI
  */
@@ -21,7 +21,7 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
      */
     constructor(
         private readonly context: vscode.ExtensionContext,
-        private clients: Client[]
+        private clients: NamedClient[]
     ) {
         try {
             this._logger = Logger.getInstance();
@@ -39,27 +39,27 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
     private _setupEventListeners(): void {
         // Listen for server events to update UI
         const eventBus = EventBus.getInstance();
-        
+
         // Set up listeners for each event type
         const startedSubscription = eventBus.on(ServerEventType.SERVER_STARTED, (event: any) => {
             console.debug('[EVENT] Server started: ', event);
         });
-        
+
         const stoppedSubscription = eventBus.on(ServerEventType.SERVER_STOPPED, (event: any) => {
             console.debug('[EVENT] Server stopped: ', event);
         });
-        
+
         const toolsChangedSubscription = eventBus.on(ServerEventType.TOOLS_CHANGED, (event: any) => {
             console.debug('[EVENT] Tools changed: ', event);
             if (event.data?.tools) {
             }
         });
-        
+
         const resourcesChangedSubscription = eventBus.on(ServerEventType.RESOURCES_CHANGED, (event: any) => {
             if (event.data?.resources) {
             }
         });
-        
+
         // Add all subscriptions to context
         this.context.subscriptions.push(
             startedSubscription,
@@ -112,13 +112,13 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
 
         try {
             const servers = [];
-            for(const client of this.clients) {
+            for (const client of this.clients) {
                 let isConnected = false;
                 try {
                     const value = await client.ping();
                     console.log('MCP Server Ping: ', value);
                     isConnected = true;
-                } catch(e) {
+                } catch (e) {
                     // console.warn(e);
                     console.debug('MCP not connected', e);
                     isConnected = false;
@@ -127,34 +127,34 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                 try {
                     const toolsResponse = await client.listTools();
                     tools = [...toolsResponse.tools];
-                } catch(e) {
+                } catch (e) {
                     console.warn(e);
                     console.debug('Server tools not available', e);
                 }
-                
+
                 let resources: Resource[] = [];
                 try {
                     const resourcesResponse = await client.listResources();
                     resources = [...resourcesResponse.resources];
-                } catch(e) {
+                } catch (e) {
                     console.debug(`Server resources not available for ${client.getServerVersion()?.name}`);
                 }
-                
+
                 const clientInfo = client.getServerVersion();
-                if(!clientInfo) {
+                if (!clientInfo) {
                     console.warn('Client info not available');
-                    
+
                 }
-                
+
                 servers.push({
                     // id: clientInfo?.name,
-                    name: clientInfo?.name,
+                    name: client.name,
                     enabled: isConnected ?? false,
                     tools: tools,
                     resources: resources,
                 });
             }
-            
+
             // Send tools for each server separately after initial state
             // This ensures proper tool registration in the UI
             for (const server of servers) {
@@ -167,9 +167,9 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                     });
                 }
             }
-            this._view.webview.postMessage({ 
-                type: 'setServers', 
-                servers: servers 
+            this._view.webview.postMessage({
+                type: 'setServers',
+                servers: servers
             });
         } catch (error) {
             ErrorHandler.handleError('Send Initial State', error);
@@ -204,7 +204,7 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                 case 'getServers':
                     await this._sendInitialState();
                     break;
-                
+
                 case 'addServer':
                     if (message.server) {
                         console.log('Adding server: ', message.server);
@@ -215,12 +215,12 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                             context: this.context,
                             serverName: message.server.name,
                             command: message.server.command,
-                            env: {...(message.server.env ?? {})},
+                            env: { ...(message.server.env ?? {}) },
                             transport: serverType === ServerType.PROCESS ? 'stdio' : 'sse',
                             url: serverType === ServerType.SSE ? message.server.url : undefined
                         });
                         this.clients.push(client);
-                       
+
                         // const client = await this.clientManager.addServer(transport, message.server.name, message.server.command);
                         const config = vscode.workspace.getConfiguration('mcpManager');
                         const servers = config.get<ServerConfig[]>('servers', []);
@@ -240,32 +240,53 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                         }
                     }
                     break;
-                
+
                 case 'removeServer':
                     if (message.name) {
-                        console.log('Removing server: ', message.name);
-                        const client = this.clients.find(client => client.getServerVersion()?.name === message.name);
-                        if(client) {
-                            await client.close();
-                        }
-                        this.clients = this.clients.filter(client => client.getServerVersion()?.name !== message.name);
-                        const config = vscode.workspace.getConfiguration('mcpManager');
-                        const servers = config.get<ServerConfig[]>('servers', []);
-                        config.update('servers', servers.filter(server => server.name !== message.name), vscode.ConfigurationTarget.Global);
-                        await this._sendInitialState();
-                        
-                        if (this._logger) {
-                            this._logger.log(`Removed server: ${message.name}`);
+                        try {
+                            console.log('Removing server: ', message.name);
+
+                            // Close the client if it exists
+                            const client = this.clients.find(client => client.name === message.name);
+                            if (client) {
+                                await client.close();
+                            }
+
+                            // Remove from clients array
+                            this.clients = this.clients.filter(client => client.name !== message.name);
+
+                            // Update VS Code settings
+                            const config = vscode.workspace.getConfiguration('mcpManager');
+                            const servers = config.get<ServerConfig[]>('servers', []);
+                            console.log('Current servers in config:', servers);
+
+                            const filteredServers = servers.filter(server => server.name !== message.name);
+                            console.log('Filtered servers after removal:', filteredServers);
+
+                            // Use await to ensure the update completes
+                            await config.update('servers', filteredServers, true);
+                            console.log(`Server "${message.name}" removed from configuration`);
+
+                            // Update UI
+                            await this._sendInitialState();
+
+                            if (this._logger) {
+                                this._logger.log(`Removed server: ${message.name}`);
+                            }
+                        } catch (error) {
+                            console.error('Error removing server:', error);
+                            this._handleError(message.name, error);
+                            ErrorHandler.handleError(`Remove Server: ${message.name}`, error);
                         }
                     }
                     break;
-                
+
                 case 'editServer':
                     if (message.server && message.server.name) {
                         throw new Error('Edit server not supported');
                     }
                     break;
-                
+
                 case 'toggleServer':
                     if (message.name !== undefined) {
                         // Get running servers from the server manager
@@ -288,9 +309,9 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                                 this._logger.log(`Stopped server: ${message.name}`);
                             }
                         }
-                        
-                            
-                            // Update UI immediately with server status and tools
+
+
+                        // Update UI immediately with server status and tools
                         await this._sendInitialState();
                     }
                     break;
@@ -428,10 +449,10 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
      */
     public static async createOrShow(
         context: vscode.ExtensionContext,
-        clients: Client[]
+        clients: NamedClient[]
     ): Promise<ServerViewProvider> {
         const provider = new ServerViewProvider(context, clients);
-        
+
         // Register the webview provider
         const provider_registration = vscode.window.registerWebviewViewProvider(
             ServerViewProvider.viewType,
@@ -442,9 +463,9 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                 }
             }
         );
-        
+
         context.subscriptions.push(provider_registration);
-        
+
         return provider;
     }
 
