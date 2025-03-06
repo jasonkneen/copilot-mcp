@@ -47,7 +47,9 @@ export async function activate(context: vscode.ExtensionContext) {
             }
 
         }
-        await createToolsExtension(clients, context);
+        if (clients.length > 0) {
+            await createToolsExtension(clients, context);
+        }
         // Register the WebView Provider using our ServerViewProvider class
         const serverViewProvider = await ServerViewProvider.createOrShow(context, clients);
         logger.log('WebView provider registered');
