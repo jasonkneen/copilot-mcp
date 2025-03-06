@@ -124,13 +124,6 @@
                 "type": "string",
                 "description": "Command to start the server (for process servers)"
               },
-              "args": {
-                "type": "array",
-                "description": "Arguments for the server command",
-                "items": {
-                  "type": "string"
-                }
-              },
               "url": {
                 "type": "string",
                 "description": "URL for SSE server connection (for SSE servers)"
