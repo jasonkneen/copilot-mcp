@@ -76,7 +76,8 @@ export async function installDynamicToolsExt(params: RegisterToolsParams) {
     const client = new NamedClient(
         {
             name: params.serverName,
-            version: "0.0.0"
+            version: "0.0.0",
+            command: params.command || ""
         },
         {
             capabilities: {
@@ -246,10 +247,12 @@ export async function uninstallToolsExtension(serverName: string) {
 
 export class NamedClient extends Client {
     protected _name: string;
+    protected _command: string;
 
-    constructor(info: Implementation, options: ClientOptions) {
+    constructor(info: Implementation & { command: string }, options: ClientOptions) {
         super(info, options);
         this._name = info.name;
+        this._command = info.command as string;
     }
 
     public get name() {
@@ -257,5 +260,11 @@ export class NamedClient extends Client {
     }
     public set name(name: string) {
         this._name = name;
+    }
+    public get command() {
+        return this._command;
+    }
+    public set command(command: string) {
+        this._command = command;
     }
 }

@@ -53,6 +53,36 @@ const handleWebviewMessage = (event: MessageEvent) => {
             ? { ...server, tools: message.tools, enabled: message.running }
             : server
         );
+    case 'serverAdded':
+      // Show success message when we receive confirmation
+      toast.success("Server added successfully", {
+        description: `"${message.serverName}" has been added to your servers.`,
+      });
+      return undefined;
+    case 'serverAddError':
+      // Show error message if server addition failed
+      toast.error("Failed to add server", {
+        description: message.error || "An unexpected error occurred.",
+      });
+      return undefined;
+    case 'serverEdited':
+      // Show success message when we receive confirmation of edit
+      if (message.originalName && message.serverName !== message.originalName) {
+        toast.success("Server updated successfully", {
+          description: `"${message.originalName}" has been updated and renamed to "${message.serverName}".`,
+        });
+      } else {
+        toast.success("Server updated successfully", {
+          description: `"${message.serverName}" has been updated.`,
+        });
+      }
+      return undefined;
+    case 'serverEditError':
+      // Show error message if server edit failed
+      toast.error("Failed to update server", {
+        description: message.error || "An unexpected error occurred.",
+      });
+      return undefined;
     default:
       return undefined;
   }
@@ -176,10 +206,8 @@ export function App() {
       server: serverConfig
     });
 
-    // Show success message
-    toast.success("Server added successfully", {
-      description: `"${serverName}" has been added to your servers.`,
-    });
+    // We no longer show success message here, we'll wait for confirmation
+    // from the extension before showing success message
 
     // Close modal and reset form
     handleCloseModal();

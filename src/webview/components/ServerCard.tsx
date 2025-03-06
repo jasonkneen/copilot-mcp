@@ -86,12 +86,20 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
     return command.replace(/'/g, "\\'").replace(/"/g, '\\"');
   };
 
+  // Update local state when server prop changes
   useEffect(() => {
-    // Always keep local state in sync with server state
     setLocalEnabled(server.enabled);
-    
-    // Reset edit fields when server changes or editing starts
+  }, [server.enabled]);
+
+  // Reset edit fields when server changes or editing starts
+  useEffect(() => {
     if (isEditing) {
+      console.log('Setting edit fields:', { 
+        name: server.name, 
+        command: server.command, 
+        url: server.url 
+      });
+      
       setEditName(server.name);
       setEditType(server.type || ServerType.PROCESS);
       setEditCommand(server.command || '');
@@ -134,10 +142,25 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
   };
 
   const handleEditServer = () => {
-    // If not in edit mode, switch to edit mode
+    // If not in edit mode, switch to edit mode and initialize form values
     if (!isEditing) {
       setIsEditing(true);
       setIsExpanded(true);
+      
+      // Set form values directly here as well as in the useEffect
+      setEditName(server.name);
+      setEditType(server.type || ServerType.PROCESS);
+      setEditCommand(server.command || '');
+      setEditUrl(server.url || '');
+      setEditAuthToken(server.authToken || '');
+      
+      // Convert env object to array for editing
+      if (server.env) {
+        setEditEnvVars(Object.entries(server.env).map(([key, value]) => ({ key, value })));
+      } else {
+        setEditEnvVars([]);
+      }
+      
       return;
     }
 
@@ -166,6 +189,7 @@ export const ServerCard = ({ className, server, onUpdate, onRemove }: ServerCard
     let updates: any = {
       name: editName.trim(),
       type: editType,
+      originalName: server.name
     };
 
     if (editType === ServerType.PROCESS) {
