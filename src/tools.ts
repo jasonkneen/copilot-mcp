@@ -11,6 +11,7 @@ import { findActualExecutable, spawnPromise } from 'spawn-rx';
 import { McpProxyTool } from './tools/McpProxyTool';
 import { Logger } from './utils/Logger';
 import findCacheDirectory from 'find-cache-dir';
+import * as vsce from '@vscode/vsce';
 export interface RegisterToolsParams {
     context: vscode.ExtensionContext;
     serverName: string;
@@ -156,12 +157,13 @@ export async function installDynamicToolsExt(params: RegisterToolsParams) {
     return client;
 }
 
-export function registerChatTools(context: vscode.ExtensionContext, tools: Tool[], client: Client) {
+export function registerChatTools(context: vscode.ExtensionContext, tools: Tool[], client: NamedClient) {
     for (const tool of tools) {
         const vscodeTool: vscode.LanguageModelTool<typeof tool['inputSchema']> = new McpProxyTool(client, tool);
-        context.subscriptions.push(
-            vscode.lm.registerTool(tool.name, vscodeTool)
-        );
+        console.log(`Registering tool: ${tool.name}`);
+        const disposable = vscode.lm.registerTool(tool.name, vscodeTool);
+        context.subscriptions.push(disposable);
+        console.log(`Registered tool: ${tool.name}`);
     }
 }
 
@@ -183,11 +185,16 @@ export async function createToolsExtension(clients: NamedClient[], context: vsco
     }));
 
     // Then extract and flatten the tools arrays
-    const tools = toolResponses.flatMap(response => response.tools);
+    const tools = toolResponses.flatMap(response => {
+        return response.tools.map(tool => ({
+            ...tool,
+            client: response.client
+        }));
+    });
 
     const toolManifest = tools.map(tool => ({
-        "name": `copilot_${tool.name}`,
-        "tags": ["mcpManager", "vscode_editing"],
+        "name": tool.name,
+        "tags": ["mcpManager", tool.client.name],
         "toolReferenceName": tool.name,
         "displayName": tool.name,
         "modelDescription": tool.description,
@@ -199,7 +206,7 @@ export async function createToolsExtension(clients: NamedClient[], context: vsco
 
     // 2. Create a minimal package.json with a contributed command
     const manifest = {
-        name: 'mcp-manager',
+        name: 'mcp-manager-tools-ext',
         main: "extension.js",
         publisher: "AutomataLabs",           // (Use your publisher ID if publishing)
         version: "0.0.1",
