@@ -224,20 +224,20 @@ export async function createToolsExtension(clients: NamedClient[], context: vsco
     fs.writeFileSync(path.join(extDir, 'extension.js'), `exports.activate = function() {}; exports.deactivate = function() {};`);
     fs.writeFileSync(path.join(extDir, 'LICENSE'), '');
 
-    // 4. Package the extension into a VSIX (using vsce or a zip utility).
-    // For brevity, we'll assume vsce is available and use child_process to run it:
-    const { args, cmd } = findActualExecutable('npx', ['-y', '@vscode/vsce', 'package', '--allow-missing-repository', '--allow-star-activation']);
-    const packageRes = await spawnPromise(cmd, args, { cwd: extDir, stdio: 'inherit' }).catch(e => e);
-    if (packageRes instanceof Error) {
-        Logger.getInstance().warn(`Failed to package extension: ${packageRes.message}`);
-        // debugger;
-        throw new Error(`Failed to package extension: ${packageRes.message}`);
+    // 4. Package the extension into a VSIX using the vsce API directly
+    try {
+        await vsce.createVSIX({
+            cwd: extDir,
+            allowMissingRepository: true,
+            allowStarActivation: true
+        });
+    } catch (err) {
+        Logger.getInstance().warn(`Failed to package extension: ${err instanceof Error ? err.message : String(err)}`);
+        throw new Error(`Failed to package extension: ${err instanceof Error ? err.message : String(err)}`);
     }
-    // Logger.getInstance().log(packageRes);
     // This produces dynamic-cmd-ext-0.0.1.vsix in the extDir.
 
     // 5. Install the VSIX using VS Code's CLI or API:
-    // const vsixPath = path.join(extDir, `${manifest.name}-${manifest.version}.vsix`);
     await vscode.commands.executeCommand('workbench.extensions.installExtension', vscode.Uri.file(`${extDir}/${manifest.name}-${manifest.version}.vsix`));
     toolResponses.forEach(response => {
         registerChatTools(context, response.tools, response.client);

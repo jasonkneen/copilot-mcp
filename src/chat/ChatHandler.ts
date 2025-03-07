@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { sendChatParticipantRequest } from '@vscode/chat-extension-utils';
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { NamedClient } from '@/tools';
 /**
  * Handles chat functionality for MCP integration by providing
@@ -18,7 +17,7 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
    * @param extensionUri The extension URI
    */
   constructor(
-    private readonly clients: NamedClient[],
+    clients: NamedClient[],
     private readonly extensionUri: vscode.ExtensionContext['extensionUri']
   ) {
     console.log('ChatHandler initialized');
@@ -51,7 +50,7 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
       }
       // Get all available tools from the tool manager
       // const allTools = await this.mcpClientManager.listTools();
-      const tools = vscode.lm.tools.filter(tool => tool.tags?.includes('mcpManager'));
+      const tools = vscode.lm.tools;
       // get all the previous participant messages
       const messages = [];
       const previousMessages = context.history.filter(
@@ -66,15 +65,17 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
         });
         messages.push(vscode.LanguageModelChatMessage.Assistant(fullMessage));
       });
-
+      
 
       console.log("Available tools:", tools.length);
 
       // Forward the request to VS Code's chat system with our tools
       const chatResult = sendChatParticipantRequest(request, context, {
         prompt: `
-        You are a helpful assistant. You can use the following tools to assist the user:
+        You are a helpful assistant. 
+        You can use the following tools to assist the user:
         ${tools.map(tool => `- ${tool.name}: ${tool.description}`).join('\n')}
+        If the user specifies a tool, find and use it to assist them.
         `,
         responseStreamOptions: {
           stream,
@@ -88,7 +89,7 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
         "Thinking..."
       );
       const result = await chatResult.result;
-      console.log("Result:", result);
+
       if (result.errorDetails) {
         stream.push(new vscode.ChatResponseMarkdownPart(
           new vscode.MarkdownString(`I encountered an error: ${result.errorDetails}`)
@@ -111,6 +112,18 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
 
       return {};
     }
+  }
+
+  private async getUserIntent(prompt: string, request: vscode.ChatRequest, context: vscode.ChatContext) {
+    const tools = vscode.lm.tools;
+    const chatResult = sendChatParticipantRequest(request, context, {
+      prompt: `
+      You are a helpful assistant. You can use the following tools to assist the user:
+      ${tools.map(tool => `- ${tool.name}: ${tool.description}`).join('\n')}
+      `,
+    }, request.toolInvocationToken);
+    const result = await chatResult.result;
+    return result;
   }
 
   /**
@@ -218,6 +231,25 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
     this._participant = participant;
 
     return participant;
+  }
+
+  set clients(clients: NamedClient[]) {
+    this._clients = clients;
+  }
+
+  get clients() {
+    return this._clients;
+  }
+
+  set participant(participant: vscode.ChatParticipant) {
+    this._participant = participant;
+  }
+
+  get participant() {
+    if (!this._participant) {
+      throw new Error('Participant not set');
+    }
+    return this._participant;
   }
 
   /**

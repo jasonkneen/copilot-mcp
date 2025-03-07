@@ -58,6 +58,12 @@ const extensionConfig = {
             loader: 'ts-loader'
           }
         ]
+      },
+      {
+        test: /\keytar.node$/,
+        use: {
+          loader: "file-loader"
+        }
       }
     ]
   },

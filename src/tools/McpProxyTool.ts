@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-// import { Client as MCPClient } from "@modelcontextprotocol/sdk/client/index";
 import { NamedClient as MCPClient } from '@/tools';
 import { CallToolRequest, Tool, CallToolResultSchema } from "@modelcontextprotocol/sdk/types";
 /**

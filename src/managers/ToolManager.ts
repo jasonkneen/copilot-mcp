@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { NamedClient as MCPClient } from "@/tools";
 import { Tool } from "@modelcontextprotocol/sdk/types";
-import { McpProxyTool } from '../tools/McpProxyTool';
+import { McpProxyTool } from '@/tools/McpProxyTool';
 
 /**
  * ToolManager handles registration and management of MCP tools

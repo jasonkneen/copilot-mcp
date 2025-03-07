@@ -4,9 +4,7 @@ import * as vscode from 'vscode';
 // Import our architectural components
 import { ChatHandler } from './chat/ChatHandler';
 import { Logger, LogLevel } from './utils/Logger';
-import { ErrorHandler } from './utils/ErrorHandler';
 import { ServerViewProvider } from './ui/ServerViewProvider';
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { ServerType } from './server/ServerConfig';
 import { ServerConfig } from './server/ServerConfig';
 import { installDynamicToolsExt, createToolsExtension, NamedClient } from './tools';
@@ -23,7 +21,6 @@ export async function activate(context: vscode.ExtensionContext) {
         const servers = config.get<ServerConfig[]>('servers', []);
         logger.log(`Servers: ${JSON.stringify(servers)}`);
         const clients: NamedClient[] = [];
-        const toolsList = [];
         for (const server of servers) {
             logger.log(`Installing dynamic tools ext for server`);
             const client = await installDynamicToolsExt({
@@ -35,10 +32,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 url: server.type === ServerType.SSE ? server.url : undefined
             });
             clients.push(client);
-            const toolsResponse = await client.listTools();
-            if (toolsResponse.tools) {
-                toolsList.push(...toolsResponse.tools);
-            }
+
             const serverInfo = client.getServerVersion();
             if (serverInfo && serverInfo.name) {
                 logger.log(`Server ${server.name} added with client ID ${serverInfo.name}`);
@@ -67,7 +61,6 @@ export async function activate(context: vscode.ExtensionContext) {
         // Register the ChatHandler
         const chatParticipant = ChatHandler.register(context, clients);
 
-        // Add disposables to extension context
         // context.subscriptions.push(chatParticipant);
         logger.log('MCP client manager initialized');
 

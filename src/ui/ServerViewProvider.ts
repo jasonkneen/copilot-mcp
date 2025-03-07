@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
-import { Logger } from '../utils/Logger';
-import { ErrorHandler } from '../utils/ErrorHandler';
+import { Logger } from '@/utils/Logger';
+import { ErrorHandler } from '@/utils/ErrorHandler';
 import { Tool, Resource } from '@modelcontextprotocol/sdk/types';
-import { EventBus } from '../utils/EventBus';
-import { ServerConfig, ServerEventType, ServerType } from '../server/ServerConfig';
+import { EventBus } from '@/utils/EventBus';
+import { ServerConfig, ServerEventType, ServerType } from '@/server/ServerConfig';
 import { createToolsExtension, installDynamicToolsExt, NamedClient } from '@/tools';
 /**
  * WebviewProvider for the MCP Server Manager UI
