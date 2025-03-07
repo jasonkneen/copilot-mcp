@@ -33,7 +33,7 @@ export async function installDynamicToolsExt(params: RegisterToolsParams) {
     // split the command into args
     const [command, ...pArguments] = params.command?.split(' ') || [];
     const { cmd: pCmd, args: pArgs } = findActualExecutable(command, pArguments);
-    const env = { ...params.env, ...getDefaultEnvironment() };
+    const env = { ...getDefaultEnvironment(), ...params.env, };
     const transportParams = {
         command: pCmd,
         args: pArgs,
