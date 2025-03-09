@@ -65,29 +65,28 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
         });
         messages.push(vscode.LanguageModelChatMessage.Assistant(fullMessage));
       });
-      
 
-      console.log("Available tools:", tools.length);
+
+      console.log("Available tools:", tools);
 
       // Forward the request to VS Code's chat system with our tools
       const chatResult = sendChatParticipantRequest(request, context, {
         prompt: `
         You are a helpful assistant. 
-        You can use the following tools to assist the user:
-        ${tools.map(tool => `- ${tool.name}: ${tool.description}`).join('\n')}
-        If the user specifies a tool, find and use it to assist them.
+        Use the tools at your disposal to assist the user.
         `,
         responseStreamOptions: {
           stream,
           references: true,
           responseText: true,
+
         },
         tools: tools,
 
       }, token);
-      stream.progress(
-        "Thinking..."
-      );
+      // stream.progress(
+      //   "Thinking..."
+      // );
       const result = await chatResult.result;
 
       if (result.errorDetails) {
@@ -118,8 +117,7 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
     const tools = vscode.lm.tools;
     const chatResult = sendChatParticipantRequest(request, context, {
       prompt: `
-      You are a helpful assistant. You can use the following tools to assist the user:
-      ${tools.map(tool => `- ${tool.name}: ${tool.description}`).join('\n')}
+      You are a helpful assistant. Use the tools at your disposal to assist the user.
       `,
     }, request.toolInvocationToken);
     const result = await chatResult.result;

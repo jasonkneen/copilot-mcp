@@ -62,8 +62,90 @@
             "description": "Retrieve resources from your MCP servers"
           }
         ]
-      }
+      },
+      {
+				"id": "copilot-mcp.tools",
+				"fullName": "Tool User",
+				"name": "tools",
+				"description": "I use tools",
+				"isSticky": true,
+				"commands": [
+					{
+						"name": "list",
+						"description": "List all available tools"
+					},
+					{
+						"name": "all",
+						"description": "Use all registered tools. By default, only this extension's tools are used."
+					}
+				]
+			}
     ],
+    "languageModelTools": [{
+      "name": "copilot-mcp_tabCount",
+      "tags": [
+        "editors",
+        "copilot-mcp"
+      ],
+      "toolReferenceName": "tabCount",
+      "displayName": "Tab Count",
+      "modelDescription": "The number of active tabs in a tab group",
+      "icon": "$(files)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tabGroup": {
+            "type": "number",
+            "description": "The index of the tab group to check. This is optional- if not specified, the active tab group will be checked.",
+            "default": 0
+          }
+        }
+      }
+    },
+    {
+      "name": "copilot-mcp_findFiles",
+      "tags": [
+        "files",
+        "search",
+        "copilot-mcp"
+      ],
+      "displayName": "Find Files",
+      "modelDescription": "Search for files in the current workspace",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "description": "Search for files that match this glob pattern"
+          }
+        },
+        "required": [
+          "pattern"
+        ]
+      }
+    },
+    {
+      "name": "copilot-mcp_runInTerminal",
+      "tags": [
+        "terminal",
+        "copilot-mcp"
+      ],
+      "displayName": "Run in Terminal",
+      "modelDescription": "Run a command in a terminal and return the output",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The command to run"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      }
+    }],
+    
     "viewsContainers": {
       "activitybar": [
         {
@@ -200,7 +282,7 @@
     "@radix-ui/react-tooltip": "^1.1.8",
     "@tailwindcss/postcss": "^4.0.6",
     "@vscode/chat-extension-utils": "^0.0.0-alpha.5",
-    "@vscode/prompt-tsx": "^0.3.0-alpha.19",
+    "@vscode/prompt-tsx": "^0.3.0-alpha.21",
     "@vscode/vsce": "^3.2.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

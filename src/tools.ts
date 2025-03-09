@@ -33,19 +33,19 @@ export async function installDynamicToolsExt(params: RegisterToolsParams) {
 
     // split the command into args
     const [command, ...pArguments] = params.command?.split(' ') || [];
-    const { cmd: pCmd, args: pArgs } = findActualExecutable(command, pArguments);
-    const env = { ...getDefaultEnvironment(), ...params.env, };
-    const transportParams = {
-        command: pCmd,
-        args: pArgs,
-        env: env,
-        cwd: findCacheDirectory({ name: 'mcp-manager' }),
-        stderr: "pipe" as const
-    };
+
     let transport: Transport;
     // 2. create a client and transport
     if (params.transport === 'stdio' || !params.transport) {
-
+        const { cmd: pCmd, args: pArgs } = findActualExecutable(command, pArguments);
+        const env = { ...getDefaultEnvironment(), ...params.env, };
+        const transportParams = {
+            command: pCmd,
+            args: pArgs,
+            env: env,
+            cwd: findCacheDirectory({ name: 'mcp-manager' }),
+            stderr: "pipe" as const
+        };
         try {
             transport = new StdioClientTransport(transportParams);
             transport.onclose = () => {
@@ -67,7 +67,8 @@ export async function installDynamicToolsExt(params: RegisterToolsParams) {
         if (!params.url) {
             throw new Error('URL is required for SSE transport');
         }
-        transport = new SSEClientTransport(new URL(params.url));
+        transport = new SSEClientTransport(new URL(params.url), {});
+        console.log('Transport: ', transport);
     } else {
         logger.warn(`Unsupported transport: ${params.transport}`);
         throw new Error(`Unsupported transport: ${params.transport}`);
@@ -100,7 +101,7 @@ export async function installDynamicToolsExt(params: RegisterToolsParams) {
     try {
         await client.connect(transport);
     } catch (e) {
-        logger.log(`Failed to connect to server with error: ${e}\n${JSON.stringify(transportParams)}`);
+        logger.log(`Failed to connect to server with error: ${e}\n${JSON.stringify(e)}`);
         throw new Error(`Failed to connect to server: ${e}`);
     }
 
@@ -247,7 +248,7 @@ export async function createToolsExtension(clients: NamedClient[], context: vsco
 
 // method to uninstall the tools extension
 export async function uninstallToolsExtension(serverName: string) {
-    const extDir = path.join(tmpdir(), toolsExtTemplate(serverName));
+    const extDir = path.join(toolsExtTemplate(serverName));
     fs.rmSync(extDir, { recursive: true, force: true });
     await vscode.commands.executeCommand('workbench.extensions.uninstallExtension', toolsExtTemplate(serverName));
 }
