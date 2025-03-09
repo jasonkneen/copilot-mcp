@@ -19,46 +19,40 @@ const typesPath = fs.existsSync(cjsTypesPath)
   ? cjsTypesPath
   : path.resolve(sdkPath, 'dist/esm/types.js');
 
-// Path to toolsParticipant directory
-const toolsParticipantPath = path.resolve(__dirname, 'src/chat/toolsParticipant');
-
 //@ts-check
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
 
 /** @type WebpackConfig */
 const extensionConfig = {
-  target: 'node',
-  mode: 'none',
-  entry: './src/extension.ts',
+  target: 'node', // VS Code extensions run in a Node.js-context 📖 -> https://webpack.js.org/configuration/node/
+	mode: 'none', // this leaves the source code as close as possible to the original (when packaging we set this to 'production')
+
+  entry: './src/extension.ts', // the entry point of this extension, 📖 -> https://webpack.js.org/configuration/entry-context/
   output: {
+    // the bundle is stored in the 'dist' folder (check package.json), 📖 -> https://webpack.js.org/configuration/output/
     path: path.resolve(__dirname, 'dist'),
     filename: 'extension.js',
     libraryTarget: 'commonjs2'
   },
   externals: {
-    vscode: 'commonjs vscode',
-    // Externalize the following toolsParticipant files to prevent compilation errors
-    './chat/toolsParticipant/toolParticipant': 'commonjs ./chat/toolsParticipant/toolParticipant',
-    './chat/toolsParticipant/tools': 'commonjs ./chat/toolsParticipant/tools',
-    './chat/toolsParticipant/toolsPrompt': 'commonjs ./chat/toolsParticipant/toolsPrompt',
-    '@vscode/prompt-tsx': 'commonjs @vscode/prompt-tsx'
+    vscode: 'commonjs vscode' // the vscode-module is created on-the-fly and must be excluded. Add other modules that cannot be webpack'ed, 📖 -> https://webpack.js.org/configuration/externals/
+    // modules added here also need to be added in the .vscodeignore file
   },
   resolve: {
+    // support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
     extensions: ['.ts', '.tsx', '.js', '.jsx'],
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      // Explicitly alias the problematic imports to their actual paths
       '@modelcontextprotocol/sdk/client/index': clientPath,
       '@modelcontextprotocol/sdk/types': typesPath
-    },
-    modules: [
-      'node_modules'
-    ]
+    }
   },
   module: {
     rules: [
       {
         test: /\.tsx?$/,
-        exclude: [/node_modules/, toolsParticipantPath],
+        exclude: /node_modules/,
         use: [
           {
             loader: 'ts-loader'
@@ -79,7 +73,6 @@ const extensionConfig = {
   },
 };
 
-/** @type WebpackConfig */
 const webviewConfig = {
   target: 'web',
   mode: 'development',
@@ -99,18 +92,16 @@ const webviewConfig = {
     extensions: ['.ts', '.tsx', '.js', '.jsx'],
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      // Explicitly alias the problematic imports to their actual paths
       '@modelcontextprotocol/sdk/client/index': clientPath,
       '@modelcontextprotocol/sdk/types': typesPath
-    },
-    modules: [
-      'node_modules'
-    ]
+    }
   },
   module: {
     rules: [
       {
         test: /\.tsx?$/,
-        exclude: [/node_modules/, toolsParticipantPath],
+        exclude: /node_modules/,
         use: [
           {
             loader: 'ts-loader',
@@ -136,54 +127,4 @@ const webviewConfig = {
   }
 };
 
-/** @type WebpackConfig */
-const toolsParticipantConfig = {
-  target: 'node',
-  mode: 'none',
-  entry: {
-    'toolParticipant': './src/chat/toolsParticipant/toolParticipant.ts',
-    'tools': './src/chat/toolsParticipant/tools.ts',
-    'toolsPrompt': './src/chat/toolsParticipant/toolsPrompt.tsx'
-  },
-  output: {
-    path: path.resolve(__dirname, 'dist/chat/toolsParticipant'),
-    filename: '[name].js',
-    libraryTarget: 'commonjs2'
-  },
-  externals: {
-    vscode: 'commonjs vscode',
-    '@vscode/prompt-tsx': 'commonjs @vscode/prompt-tsx'
-  },
-  resolve: {
-    extensions: ['.ts', '.tsx', '.js', '.jsx'],
-    alias: {
-      '@': path.resolve(__dirname, 'src'),
-      '@vscode/prompt-tsx': path.resolve(toolsParticipantPath, 'node_modules/@vscode/prompt-tsx'),
-      '@vscode/prompt-tsx/dist/base/promptElements': path.resolve(toolsParticipantPath, 'node_modules/@vscode/prompt-tsx/dist/base/promptElements')
-    },
-    modules: [
-      path.resolve(toolsParticipantPath, 'node_modules'),
-      'node_modules'
-    ]
-  },
-  module: {
-    rules: [
-      {
-        test: /\.tsx?$/,
-        use: [
-          {
-            loader: 'ts-loader',
-            options: {
-              configFile: path.resolve(toolsParticipantPath, 'tsconfig.json'),
-              transpileOnly: true,
-              happyPackMode: true
-            }
-          }
-        ]
-      }
-    ]
-  },
-  devtool: 'nosources-source-map'
-};
-
-module.exports = [extensionConfig, webviewConfig, toolsParticipantConfig];
+module.exports = [ extensionConfig, webviewConfig ];

@@ -104,15 +104,6 @@ export function App() {
     return /^[a-zA-Z0-9_-]+$/.test(name);
   };
 
-  const validateUrl = (url: string): boolean => {
-    try {
-      new URL(url);
-      return true;
-    } catch (e) {
-      return false;
-    }
-  };
-
   const escapeCommand = (command: string): string => {
     // Replace single quotes with escaped single quotes
     // Replace double quotes with escaped double quotes
@@ -176,11 +167,6 @@ export function App() {
     
     if (serverType === ServerType.SSE && !serverUrl.trim()) {
       setFormError('URL is required for SSE servers');
-      return;
-    }
-    
-    if (serverType === ServerType.SSE && !validateUrl(serverUrl.trim())) {
-      setFormError('Please enter a valid URL (e.g., https://example.com/events)');
       return;
     }
 
