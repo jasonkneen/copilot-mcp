@@ -1,17 +1,18 @@
 import fs from 'fs';
 import path from 'path';
-import { tmpdir } from 'os';
 import * as vscode from 'vscode';
-import { CreateMessageRequestSchema, Implementation, ListRootsRequest, ListRootsRequestSchema, Tool } from '@modelcontextprotocol/sdk/types';
+import { CreateMessageRequestSchema, Implementation, ListRootsRequestSchema, Tool } from '@modelcontextprotocol/sdk/types';
 import { Client, ClientOptions } from "@modelcontextprotocol/sdk/client/index.js";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse';
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { findActualExecutable, spawnPromise } from 'spawn-rx';
+import { findActualExecutable } from 'spawn-rx';
 import { McpProxyTool } from './tools/McpProxyTool';
 import { Logger } from './utils/Logger';
 import findCacheDirectory from 'find-cache-dir';
 import * as vsce from '@vscode/vsce';
+import { ServerType } from './server/ServerConfig';
+
 export interface RegisterToolsParams {
     context: vscode.ExtensionContext;
     serverName: string;
@@ -19,12 +20,14 @@ export interface RegisterToolsParams {
     env?: {
         [key: string]: string;
     }
-    transport?: 'stdio' | 'sse';
+    transport?: ServerType;
     url?: string;
 }
 
 export const toolsExtTemplate = (serverName: string) => `mcpManager-${serverName}-tools-ext`;
 
+// Map to track which tools belong to which server
+const serverToolsMap = new Map<string, vscode.Disposable[]>();
 
 export async function installDynamicToolsExt(params: RegisterToolsParams) {
     const logger = Logger.getInstance();
@@ -36,7 +39,7 @@ export async function installDynamicToolsExt(params: RegisterToolsParams) {
 
     let transport: Transport;
     // 2. create a client and transport
-    if (params.transport === 'stdio' || !params.transport) {
+    if (params.transport === ServerType.PROCESS || !params.transport) {
         const { cmd: pCmd, args: pArgs } = findActualExecutable(command, pArguments);
         const env = { ...getDefaultEnvironment(), ...params.env, };
         const transportParams = {
@@ -63,7 +66,7 @@ export async function installDynamicToolsExt(params: RegisterToolsParams) {
             logger.warn(`Failed to create stdio transport: ${e}`);
             throw new Error(`Failed to create stdio transport: ${e}`);
         }
-    } else if (params.transport === 'sse') {
+    } else if (params.transport === ServerType.SSE) {
         if (!params.url) {
             throw new Error('URL is required for SSE transport');
         }
@@ -159,13 +162,44 @@ export async function installDynamicToolsExt(params: RegisterToolsParams) {
 }
 
 export function registerChatTools(context: vscode.ExtensionContext, tools: Tool[], client: NamedClient) {
+    // Initialize array for this server if it doesn't exist
+    if (!serverToolsMap.has(client.name)) {
+        serverToolsMap.set(client.name, []);
+    }
+
     for (const tool of tools) {
         const vscodeTool: vscode.LanguageModelTool<typeof tool['inputSchema']> = new McpProxyTool(client, tool);
         console.log(`Registering tool: ${tool.name}`);
         const disposable = vscode.lm.registerTool(tool.name, vscodeTool);
         context.subscriptions.push(disposable);
+
+        // Store the disposable in our map for later cleanup
+        serverToolsMap.get(client.name)?.push(disposable);
+
         console.log(`Registered tool: ${tool.name}`);
     }
+}
+
+/**
+ * Unregister all tools for a specific server
+ * @param serverName The name of the server whose tools should be unregistered
+ */
+export function unregisterServerTools(serverName: string): void {
+    const disposables = serverToolsMap.get(serverName);
+    if (!disposables || disposables.length === 0) {
+        console.log(`No tools to unregister for server: ${serverName}`);
+        return;
+    }
+
+    // Dispose each tool
+    for (const disposable of disposables) {
+        disposable.dispose();
+        console.log(`Disposed tool for server: ${serverName}`);
+    }
+
+    // Clear the map entry
+    serverToolsMap.delete(serverName);
+    console.log(`Unregistered ${disposables.length} tools for server: ${serverName}`);
 }
 
 export async function createToolsExtension(clients: NamedClient[], context: vscode.ExtensionContext) {

@@ -8,9 +8,13 @@ import { ServerViewProvider } from './ui/ServerViewProvider';
 import { ServerType } from './server/ServerConfig';
 import { ServerConfig } from './server/ServerConfig';
 import { installDynamicToolsExt, createToolsExtension, NamedClient } from './tools';
+import { registerToolUserChatParticipant } from 'tools-participant';
+import { registerChatTools } from 'tools-participant';
 // This method is called when your extension is activated
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Starting activation of copilot-mcp extension...');
+    registerToolUserChatParticipant(context);
+    registerChatTools(context);
     try {
         // Initialize the logger for the extension
         const logger = Logger.initialize(context, 'MCP Server Manager', LogLevel.Debug);
@@ -28,7 +32,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 serverName: server.name.trim(),
                 command: server.command,
                 env: { ...(server.env ?? {}) },
-                transport: server.type === ServerType.PROCESS ? 'stdio' : 'sse',
+                transport: server.type,
                 url: server.type === ServerType.SSE ? server.url : undefined
             });
             clients.push(client);
@@ -67,7 +71,7 @@ export async function activate(context: vscode.ExtensionContext) {
         // Add disposables to extension context
         context.subscriptions.push(
             // Core components
-            { dispose: () => serverViewProvider.dispose() },
+            serverViewProvider,
             // Chat participant
             chatParticipant
         );

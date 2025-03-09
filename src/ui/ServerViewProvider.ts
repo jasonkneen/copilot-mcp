@@ -4,7 +4,7 @@ import { ErrorHandler } from '@/utils/ErrorHandler';
 import { Tool, Resource } from '@modelcontextprotocol/sdk/types';
 import { EventBus } from '@/utils/EventBus';
 import { ServerConfig, ServerEventType, ServerType } from '@/server/ServerConfig';
-import { createToolsExtension, installDynamicToolsExt, NamedClient } from '@/tools';
+import { createToolsExtension, installDynamicToolsExt, NamedClient, unregisterServerTools } from '@/tools';
 /**
  * WebviewProvider for the MCP Server Manager UI
  */
@@ -217,7 +217,7 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                                 serverName: message.server.name,
                                 command: message.server.command,
                                 env: { ...(message.server.env ?? {}) },
-                                transport: serverType === ServerType.PROCESS ? 'stdio' : 'sse',
+                                transport: serverType,
                                 url: serverType === ServerType.SSE ? message.server.url : undefined
                             });
                             this.clients.push(client);
@@ -228,7 +228,10 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                                 name: message.server.name,
                                 command: message.server.command,
                                 type: serverType,
-                                enabled: true
+                                enabled: true,
+                                url: serverType === ServerType.SSE ? message.server.url : undefined,
+                                authToken: message.server.authToken,
+                                env: { ...(message.server.env ?? {}) },
                             });
                             await config.update('servers', servers, vscode.ConfigurationTarget.Global);
                             await this._sendInitialState();
@@ -271,6 +274,9 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                             // Close the client if it exists
                             const client = this.clients.find(client => client.name === message.name);
                             if (client) {
+                                // Unregister tools for this server before closing the client
+                                unregisterServerTools(message.name);
+
                                 await client.close();
                                 this.clients = this.clients.filter(c => c.name !== message.name);
                             }
@@ -325,7 +331,7 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                                 serverName: newServerName, // Use the new name for the new client
                                 command: message.server.command,
                                 env: { ...(message.server.env ?? {}) },
-                                transport: serverType === ServerType.PROCESS ? 'stdio' : 'sse',
+                                transport: serverType,
                                 url: serverType === ServerType.SSE ? message.server.url : undefined
                             });
                             this.clients.push(client);

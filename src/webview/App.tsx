@@ -191,13 +191,14 @@ export function App() {
 
     if (serverType === ServerType.PROCESS) {
       serverConfig.command = escapeCommand(serverCommand.trim());
-      // Only include env vars if there are actually keys defined
-      if (Object.keys(env).length > 0) {
-        serverConfig.env = env;
-      }
+      
     } else {
       serverConfig.url = serverUrl.trim();
       serverConfig.authToken = serverAuthToken;
+    }
+    // Only include env vars if there are actually keys defined
+    if (Object.keys(env).length > 0) {
+      serverConfig.env = env;
     }
 
     // Send to extension
