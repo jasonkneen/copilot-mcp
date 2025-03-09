@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { sendChatParticipantRequest } from '@vscode/chat-extension-utils';
 import { NamedClient } from '@/tools';
+
 /**
  * Handles chat functionality for MCP integration by providing
  * chat handling and followup capabilities
@@ -65,25 +66,28 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
         });
         messages.push(vscode.LanguageModelChatMessage.Assistant(fullMessage));
       });
-      
 
+      const workspaceRoots = vscode.workspace.workspaceFolders ?? [];
       console.log("Available tools:", tools.length);
+      // Render TSX prompt
 
       // Forward the request to VS Code's chat system with our tools
+      const prompt = `
+      You are a helpful coding agent. This is the path of your current workspace(s):
+      ${workspaceRoots.map(root => `- ${root.uri.scheme}://${root.uri.fsPath}`).join('\n')}
+      If a tool requires a file path, you can provide the following path(s).
+      
+      `;
+      console.log(`Prompt: ${prompt}`);
+
       const chatResult = sendChatParticipantRequest(request, context, {
-        prompt: `
-        You are a helpful assistant. 
-        You can use the following tools to assist the user:
-        ${tools.map(tool => `- ${tool.name}: ${tool.description}`).join('\n')}
-        If the user specifies a tool, find and use it to assist them.
-        `,
+        prompt: prompt,
         responseStreamOptions: {
           stream,
           references: true,
           responseText: true,
         },
         tools: tools,
-
       }, token);
       stream.progress(
         "Thinking..."
@@ -266,4 +270,5 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
     const handler = new ChatHandler(clients, context.extensionUri);
     return handler.register();
   }
+
 }

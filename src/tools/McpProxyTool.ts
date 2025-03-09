@@ -46,7 +46,13 @@ export class McpProxyTool implements vscode.LanguageModelChatTool {
                 // }
             };
             console.log("CallToolRequest Params:", payload);
-            const result = await this._client.callTool(payload);
+            const result = await this._client.callTool(payload, CallToolResultSchema, {
+                // timeout in milliseconds, we should set it to 5 minutes
+                'timeout': 5 * 60 * 1000,
+                onprogress: (progress) => {
+                    console.log("Tool progress:", progress);
+                }
+            });
             console.log("Tool result:", result);
             // Parse the CallToolResponse
             const parsedResult = CallToolResultSchema.parse(result);

@@ -130,24 +130,6 @@ export async function installDynamicToolsExt(params: RegisterToolsParams) {
         };
     });
 
-    // Set the request handler for the ListRootsRequest
-    client.setRequestHandler(ListRootsRequestSchema, async () => {
-        const root = vscode.workspace.workspaceFolders?.[0].uri || vscode.workspace.rootPath;
-        if (!root) {
-            return {
-                roots: []
-            };
-        }
-        return {
-            roots: [
-                {
-                    uri: root,
-                    name: 'working_directory',
-                    type: 'directory'
-                }
-            ]
-        };
-    });
     console.log('Initializing tools for server: ');
     // Get the tools from the client
     const toolsResponse = await client.listTools();
@@ -165,6 +147,22 @@ export function registerChatTools(context: vscode.ExtensionContext, tools: Tool[
     // Initialize array for this server if it doesn't exist
     if (!serverToolsMap.has(client.name)) {
         serverToolsMap.set(client.name, []);
+        // Set the request handler for the ListRootsRequest
+        client.setRequestHandler(ListRootsRequestSchema, async () => {
+            const roots = vscode.workspace.workspaceFolders?.map(folder => (`${folder.uri.scheme}://${folder.uri.fsPath}`));
+            if (!roots || roots.length === 0) {
+                return {
+                    roots: []
+                };
+            }
+            return {
+                roots: roots.map(root => ({
+                    uri: root,
+                    name: 'workspace_directory',
+                    type: 'directory'
+                }))
+            };
+        });
     }
 
     for (const tool of tools) {

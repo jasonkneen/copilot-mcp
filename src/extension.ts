@@ -12,6 +12,7 @@ import { registerToolUserChatParticipant } from 'tools-participant';
 import { registerChatTools } from 'tools-participant';
 // This method is called when your extension is activated
 export async function activate(context: vscode.ExtensionContext) {
+    console.log('Workspace folders:', vscode.workspace.workspaceFolders);
     console.log('Starting activation of copilot-mcp extension...');
     registerToolUserChatParticipant(context);
     registerChatTools(context);
@@ -85,8 +86,6 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage(`Failed to activate the extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
-
-
 
 // This method is called when your extension is deactivated
 export function deactivate() {

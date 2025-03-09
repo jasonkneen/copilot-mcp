@@ -14,3 +14,4 @@ vsc-extension-quickstart.md
 !server-light.svg
 !server-dark.svg
 **/.vscode-test.*
+**/*.md

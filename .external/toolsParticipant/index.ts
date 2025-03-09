@@ -10,4 +10,5 @@
 // Re-export everything from the main files
 export * from './toolParticipant';
 export * from './tools';
-export * from './toolsPrompt'; 
+export * from './toolsPrompt';
+export * from './mcpPrompt';
