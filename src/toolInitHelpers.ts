@@ -120,77 +120,111 @@ export async function registerMCPServer(params: RegisterMCPServerParams) {
 
 export async function createToolsExtension(clients: NamedClient[], context: vscode.ExtensionContext) {
     const extDir = path.join(context.globalStorageUri.fsPath, '.cache');
-    vscode.workspace.fs.createDirectory(vscode.Uri.file(extDir));
-    console.log(`Extension directory: ${extDir}`);
-    if (!extDir) {
-        throw new Error('Failed to create extension directory');
-    }
-    const enabledClients = clients.filter(client => client.enabled);
-    // First collect all tool responses and map them to the client name
-    const toolResponses = await Promise.all(enabledClients.map(async (client, index) => {
-        const response = await client.listTools();
-        return {
-            client: client,
-            tools: response.tools
-        };
-    }));
-
-    // Then extract and flatten the tools arrays
-    const tools = toolResponses.flatMap(response => {
-        return response.tools.map(tool => ({
-            ...tool,
-            client: response.client
-        }));
-    });
-
-    const toolManifest = tools.map(tool => ({
-        "name": tool.name,
-        "tags": ["mcpManager", tool.client.name],
-        "toolReferenceName": tool.name,
-        "displayName": tool.name,
-        "modelDescription": tool.description,
-        "inputSchema": tool.inputSchema,
-        "canBeReferencedInPrompt": true,
-        "icon": "$(note)",
-        "userDescription": tool.description
-    }));
-
-    // 2. Create a minimal package.json with a contributed command
-    const manifest = {
-        name: 'mcp-manager-tools-ext',
-        main: "extension.js",
-        publisher: "AutomataLabs",           // (Use your publisher ID if publishing)
-        version: "0.0.1",
-        engines: { vscode: "^1.97.0" },
-        activationEvents: ["*"],            // activate on startup (or specify specific event)
-        contributes: {
-            languageModelTools: [
-                ...toolManifest
-            ]
-        }
-    };
-    await vscode.workspace.fs.writeFile(vscode.Uri.file(path.join(extDir, 'package.json')), Buffer.from(JSON.stringify(manifest, null, 2)));
-    // 3. Provide an empty extension entry point (required for VSIX packaging) and empty LICENSE file
-    await vscode.workspace.fs.writeFile(vscode.Uri.file(path.join(extDir, 'extension.js')), Buffer.from(`exports.activate = function() {}; exports.deactivate = function() {};`));
-    await vscode.workspace.fs.writeFile(vscode.Uri.file(path.join(extDir, 'LICENSE')), Buffer.from(''));
-
-    // 4. Package the extension into a VSIX using the vsce API directly
     try {
-        await vsce.createVSIX({
-            cwd: extDir,
-            allowMissingRepository: true,
-            allowStarActivation: true,
-        });
-    } catch (err) {
-        console.warn(`Failed to package extension: ${err instanceof Error ? err.message : String(err)}`);
-        throw new Error(`Failed to package extension: ${err instanceof Error ? err.message : String(err)}`);
-    }
+        await vscode.workspace.fs.createDirectory(vscode.Uri.file(extDir));
+        console.log(`Extension directory: ${extDir}`);
+        
+        const enabledClients = clients.filter(client => client.enabled);
+        if (enabledClients.length === 0) {
+            console.log('No enabled clients found, skipping tools extension creation');
+            return;
+        }
+        
+        // First collect all tool responses and map them to the client name
+        const toolResponses = await Promise.all(enabledClients.map(async (client, index) => {
+            const response = await client.listTools();
+            return {
+                client: client,
+                tools: response.tools
+            };
+        }));
 
-    // 5. Install the VSIX using VS Code's CLI or API:
-    await vscode.commands.executeCommand('workbench.extensions.installExtension', vscode.Uri.file(`${extDir}/${manifest.name}-${manifest.version}.vsix`));
-    toolResponses.forEach(response => {
-        registerChatTools(context, response.tools, response.client);
-    });
+        // Then extract and flatten the tools arrays
+        const tools = toolResponses.flatMap(response => {
+            return response.tools.map(tool => ({
+                ...tool,
+                client: response.client
+            }));
+        });
+
+        if (tools.length === 0) {
+            console.log('No tools found, skipping tools extension creation');
+            return;
+        }
+
+        const toolManifest = tools.map(tool => ({
+            "name": tool.name,
+            "tags": ["mcpManager", tool.client.name],
+            "toolReferenceName": tool.name,
+            "displayName": tool.name,
+            "modelDescription": tool.description,
+            "inputSchema": tool.inputSchema,
+            "canBeReferencedInPrompt": true,
+            "icon": "$(note)",
+            "userDescription": tool.description
+        }));
+
+        // 2. Create a minimal package.json with a contributed command
+        const manifest = {
+            name: 'mcp-manager-tools-ext',
+            main: "extension.js",
+            publisher: "AutomataLabs",           // (Use your publisher ID if publishing)
+            version: "0.0.1",
+            engines: { vscode: "^1.97.0" },
+            activationEvents: ["*"],            // activate on startup (or specify specific event)
+            contributes: {
+                languageModelTools: [
+                    ...toolManifest
+                ]
+            }
+        };
+        await vscode.workspace.fs.writeFile(vscode.Uri.file(path.join(extDir, 'package.json')), Buffer.from(JSON.stringify(manifest, null, 2)));
+        // 3. Provide an empty extension entry point (required for VSIX packaging) and empty LICENSE file
+        await vscode.workspace.fs.writeFile(vscode.Uri.file(path.join(extDir, 'extension.js')), Buffer.from(`exports.activate = function() {}; exports.deactivate = function() {};`));
+        await vscode.workspace.fs.writeFile(vscode.Uri.file(path.join(extDir, 'LICENSE')), Buffer.from(''));
+
+        // 4. Package the extension into a VSIX using the vsce API directly
+        try {
+            await vsce.createVSIX({
+                cwd: extDir,
+                allowMissingRepository: true,
+                allowStarActivation: true,
+            });
+        } catch (err) {
+            console.warn(`Failed to package extension: ${err instanceof Error ? err.message : String(err)}`);
+            // Cleanup in case of failure
+            await cleanupExtensionFiles(extDir);
+            throw new Error(`Failed to package extension: ${err instanceof Error ? err.message : String(err)}`);
+        }
+
+        // 5. Install the VSIX using VS Code's CLI or API:
+        try {
+            await vscode.commands.executeCommand('workbench.extensions.installExtension', vscode.Uri.file(`${extDir}/${manifest.name}-${manifest.version}.vsix`));
+            toolResponses.forEach(response => {
+                registerChatTools(context, response.tools, response.client);
+            });
+        } catch (err) {
+            console.warn(`Failed to install extension: ${err instanceof Error ? err.message : String(err)}`);
+            await cleanupExtensionFiles(extDir);
+            throw new Error(`Failed to install extension: ${err instanceof Error ? err.message : String(err)}`);
+        }
+    } catch (err) {
+        console.warn(`Error creating tools extension: ${err instanceof Error ? err.message : String(err)}`);
+        throw new Error(`Error creating tools extension: ${err instanceof Error ? err.message : String(err)}`);
+    }
+}
+
+// Helper function to clean up extension files in case of failure
+async function cleanupExtensionFiles(extDir: string): Promise<void> {
+    try {
+        const vsixPath = path.join(extDir, 'mcp-manager-tools-ext-0.0.1.vsix');
+        if (fs.existsSync(vsixPath)) {
+            fs.unlinkSync(vsixPath);
+        }
+        // Optionally, remove other files if needed
+    } catch (err) {
+        console.warn(`Failed to clean up extension files: ${err instanceof Error ? err.message : String(err)}`);
+    }
 }
 
 export function registerChatTools(context: vscode.ExtensionContext, tools: Tool[], client: NamedClient) {
