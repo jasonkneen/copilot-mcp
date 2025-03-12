@@ -62,15 +62,13 @@ To configure your MCP servers in VSCode settings:
 {
   "mcpManager.servers": [
     {
-      "id": "process-server",
-      "name": "Process MCP Server",
+      "name": "Process-MCP-Server",
       "type": "process",
       "command": "start-server-command",
       "enabled": true
     },
     {
-      "id": "sse-server",
-      "name": "SSE MCP Server",
+      "name": "SSE-MCP-Server",
       "type": "sse",
       "url": "https://your-sse-server.com/events",
       "authToken": "your-optional-auth-token",
@@ -84,7 +82,6 @@ To configure your MCP servers in VSCode settings:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `id` | string | Unique identifier for the server |
 | `name` | string | Display name for the server |
 | `type` | string | Server type: "process" or "sse" |
 | `command` | string | Command to start the server (for process servers) |
@@ -100,7 +97,6 @@ To configure your MCP servers in VSCode settings:
 3. Enable/disable servers as needed
 4. Use GitHub Copilot Chat with your connected MCP tools using the `@mcp` participant
 5. View server status and tool availability in real-time
-6. If upgrading from an older version, you can use the command "MCP: Migrate Server Configurations to Latest Format" to update your server configurations
 
 ## 🔗 Requirements
 
