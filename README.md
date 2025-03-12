@@ -46,7 +46,7 @@
 
 ## 📦 Installation
 
-1. Install the extension from the VSCode Marketplace
+1. Install the [extension](https://marketplace.visualstudio.com/items?itemName=AutomataLabs.copilot-mcp) from the VSCode Marketplace
 2. Configure your MCP servers through the extension settings
 3. Start using GitHub Copilot Chat with your MCP tools!
 
@@ -118,7 +118,7 @@ To configure your MCP servers in VSCode settings:
 ## 👥 Contributing
 
 Contributions, issues and feature requests are welcome!
-Feel free to check the [issues page](https://github.com/yourusername/copilot-mcp/issues).
+Feel free to check the [issues page](https://github.com/VikashLoomba/copilot-mcp/issues).
 
 ## ✍️ Author
 
