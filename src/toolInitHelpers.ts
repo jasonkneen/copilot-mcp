@@ -283,7 +283,7 @@ export async function registerServerAndClients(servers: ServerConfig[], context:
             url: server.type === ServerType.SSE ? server.url : undefined,
             enabled: server.enabled
         });
-        if (client && client.enabled) {
+        if (client) {
             clients.push(client);
         }
     }
