@@ -1,17 +1,16 @@
 import * as vscode from 'vscode';
-import { Logger } from '@/utils/Logger';
 import { ErrorHandler } from '@/utils/ErrorHandler';
-import { Tool, Resource } from '@modelcontextprotocol/sdk/types';
+import { Tool } from '@modelcontextprotocol/sdk/types';
 import { EventBus } from '@/utils/EventBus';
 import { ServerConfig, ServerEventType, ServerType } from '@/server/ServerConfig';
-import { createToolsExtension, installDynamicToolsExt, NamedClient, unregisterServerTools } from '@/tools';
+import { createToolsExtension, registerMCPServer, NamedClient, unregisterServerTools } from '@/toolInitHelpers';
+import { ChatHandler } from '@/chat/ChatHandler';
 /**
  * WebviewProvider for the MCP Server Manager UI
  */
 export class ServerViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'mcpServerManager';
     private _view?: vscode.WebviewView;
-    private _logger?: Logger;
 
     /**
      * Creates a new server view provider
@@ -22,12 +21,6 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
         private readonly context: vscode.ExtensionContext,
         private clients: NamedClient[]
     ) {
-        try {
-            this._logger = Logger.getInstance();
-        } catch (error) {
-            // Logger not initialized
-        }
-
         // Listen for server events and update the UI accordingly
         this._setupEventListeners();
     }
@@ -87,6 +80,7 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
             enableScripts: true,
             // Restrict the webview to only load resources from the extension's directory
             localResourceRoots: [
+                ...(vscode.workspace.workspaceFolders?.map(folder => folder.uri) || []),
                 vscode.Uri.joinPath(this.context.extensionUri, 'dist')
             ]
         };
@@ -108,49 +102,21 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
         if (!this._view) {
             return;
         }
-
         try {
             const servers = [];
             for (const client of this.clients) {
-                let isConnected = false;
-                try {
-                    const value = await client.ping();
-                    console.log('MCP Server Ping: ', value);
-                    isConnected = true;
-                } catch (e) {
-                    // console.warn(e);
-                    console.debug('MCP not connected', e);
-                    isConnected = false;
-                }
                 let tools: Tool[] = [];
                 try {
-                    const toolsResponse = await client.listTools();
+                    const toolsResponse = client.enabled ? await client.listTools() : { tools: [] };
                     tools = [...toolsResponse.tools];
                 } catch (e) {
-                    console.warn(e);
-                    console.debug('Server tools not available', e);
-                }
-
-                let resources: Resource[] = [];
-                try {
-                    const resourcesResponse = await client.listResources();
-                    resources = [...resourcesResponse.resources];
-                } catch (e) {
-                    console.debug(`Server resources not available for ${client.getServerVersion()?.name}`);
-                }
-
-                const clientInfo = client.getServerVersion();
-                if (!clientInfo) {
-                    console.warn('Client info not available');
-
+                    console.log(`Server tools not available for ${client.name}`, e);
                 }
 
                 servers.push({
-                    // id: clientInfo?.name,
                     name: client.name,
-                    enabled: isConnected ?? false,
+                    enabled: client.enabled,
                     tools: tools,
-                    resources: resources,
                     command: client.command,
                 });
             }
@@ -212,7 +178,7 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
 
                         try {
                             // const { cmd, args: actualArgs } = findActualExecutable(command, args);
-                            const client = await installDynamicToolsExt({
+                            const client = await registerMCPServer({
                                 context: this.context,
                                 serverName: message.server.name,
                                 command: message.server.command,
@@ -220,40 +186,40 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                                 transport: serverType,
                                 url: serverType === ServerType.SSE ? message.server.url : undefined
                             });
-                            this.clients.push(client);
-                            await createToolsExtension(this.clients, this.context);
-                            const config = vscode.workspace.getConfiguration('mcpManager');
-                            const servers = config.get<ServerConfig[]>('servers', []);
-                            servers.push({
-                                name: message.server.name,
-                                command: message.server.command,
-                                type: serverType,
-                                enabled: true,
-                                url: serverType === ServerType.SSE ? message.server.url : undefined,
-                                authToken: message.server.authToken,
-                                env: { ...(message.server.env ?? {}) },
-                            });
-                            await config.update('servers', servers, vscode.ConfigurationTarget.Global);
-                            await this._sendInitialState();
-                            this._logger?.log(`Has Name? ${client.getServerVersion()?.name}`);
-                            this._logger?.log(`Check VSCode Tools: ${JSON.stringify(vscode.lm.tools)}`);
-                            if (this._logger) {
-                                this._logger.log(`Added ${serverType} server: ${client}`);
-                            }
-
-                            // Send success message back to webview
-                            if (this._view) {
-                                this._view.webview.postMessage({
-                                    type: 'serverAdded',
-                                    serverName: message.server.name
+                            if (client) {
+                                this.clients.push(client);
+                                await createToolsExtension(this.clients, this.context);
+                                const config = vscode.workspace.getConfiguration('mcpManager');
+                                const servers = config.get<ServerConfig[]>('servers', []);
+                                servers.push({
+                                    name: message.server.name,
+                                    command: message.server.command,
+                                    type: serverType,
+                                    enabled: true,
+                                    url: serverType === ServerType.SSE ? message.server.url : undefined,
+                                    authToken: message.server.authToken,
+                                    env: { ...(message.server.env ?? {}) },
                                 });
+                                await config.update('servers', servers, vscode.ConfigurationTarget.Global);
+                                await this._sendInitialState();
+
+                                // Send success message back to webview
+                                if (this._view) {
+                                    this._view.webview.postMessage({
+                                        type: 'serverAdded',
+                                        serverName: message.server.name
+                                    });
+                                }
+                            } else {
+                                if (this._view) {
+                                    this._view.webview.postMessage({
+                                        type: 'serverAddError',
+                                        message: `Failed to add server ${message.server.name}. Please check the server command and use absolute paths if necessary.`
+                                    });
+                                }
                             }
                         } catch (error) {
                             console.error('Error adding server:', error);
-                            if (this._logger) {
-                                this._logger.error(`Error adding server: ${error}`);
-                            }
-
                             // Send error message back to webview
                             if (this._view) {
                                 this._view.webview.postMessage({
@@ -326,7 +292,7 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                             }
 
                             // Create a new client with the updated configuration
-                            const client = await installDynamicToolsExt({
+                            const client = await registerMCPServer({
                                 context: this.context,
                                 serverName: newServerName, // Use the new name for the new client
                                 command: message.server.command,
@@ -334,42 +300,47 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                                 transport: serverType,
                                 url: serverType === ServerType.SSE ? message.server.url : undefined
                             });
-                            this.clients.push(client);
+                            if (client) {
+                                this.clients.push(client);
+                                // Update the server configuration
+                                const oldServer = servers[serverIndex];
+                                const updatedServer = {
+                                    ...oldServer,  // Start with existing properties
+                                    // Apply new properties from the message, including the new name
+                                    name: newServerName,
+                                    type: serverType,
+                                    enabled: true,
+                                    command: message.server.command,
+                                    url: message.server.url,
+                                    authToken: message.server.authToken,
+                                    env: message.server.env
+                                };
+                                servers[serverIndex] = updatedServer;
 
-                            // Update the server configuration
-                            const oldServer = servers[serverIndex];
-                            const updatedServer = {
-                                ...oldServer,  // Start with existing properties
-                                // Apply new properties from the message, including the new name
-                                name: newServerName,
-                                type: serverType,
-                                enabled: true,
-                                command: message.server.command,
-                                url: message.server.url,
-                                authToken: message.server.authToken,
-                                env: message.server.env
-                            };
-                            servers[serverIndex] = updatedServer;
+                                await config.update('servers', servers, vscode.ConfigurationTarget.Global);
+                                await this._sendInitialState();
 
-                            await config.update('servers', servers, vscode.ConfigurationTarget.Global);
-                            await this._sendInitialState();
-
-                            // Send success message back to webview
-                            if (this._view) {
-                                this._view.webview.postMessage({
-                                    type: 'serverEdited',
-                                    serverName: newServerName,
-                                    originalName: originalServerName
-                                });
+                                // Send success message back to webview
+                                if (this._view) {
+                                    this._view.webview.postMessage({
+                                        type: 'serverEdited',
+                                        serverName: newServerName,
+                                        originalName: originalServerName
+                                    });
+                                }
+                                console.log(`Edited server: ${originalServerName} -> ${newServerName}`);
+                            } else {
+                                if (this._view) {
+                                    this._view.webview.postMessage({
+                                        type: 'serverEditError',
+                                        message: `Failed to edit server ${message.server.name}. Please check the server command and use absolute paths if necessary.`
+                                    });
+                                }
                             }
 
-                            this._logger?.log(`Edited server: ${originalServerName} -> ${newServerName}`);
+
                         } catch (error) {
                             console.error('Error editing server:', error);
-                            if (this._logger) {
-                                this._logger.error(`Error editing server: ${error}`);
-                            }
-
                             // Send error message back to webview
                             if (this._view) {
                                 this._view.webview.postMessage({
@@ -385,24 +356,27 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                 case 'toggleServer':
                     if (message.name !== undefined) {
                         // Get running servers from the server manager
-                        const client = this.clients.find(client => client.getServerVersion()?.name === message.name);
+                        const client = this.clients.find(client => client.name === message.name);
                         if (!client) {
                             return;
                         }
-                        const isRunning = await client.ping();
-                        if (!isRunning) {
+                        if (message.enabled) {
                             // toggle the server on
                             console.log('Starting server: ', message.name);
-                            await client.transport?.start();
-                            if (this._logger) {
-                                this._logger.log(`Started server: ${message.name}`);
-                            }
+                            client.enabled = true;
+                            const config = vscode.workspace.getConfiguration('mcpManager');
+                            const servers = config.get<ServerConfig[]>('servers', []);
+                            const serverIndex = servers.findIndex(s => s.name === message.name);
+                            servers[serverIndex].enabled = true;
+                            await config.update('servers', servers, vscode.ConfigurationTarget.Global);
                         } else {
                             // toggle the server off
                             await client.close();
-                            if (this._logger) {
-                                this._logger.log(`Stopped server: ${message.name}`);
-                            }
+                            const config = vscode.workspace.getConfiguration('mcpManager');
+                            const servers = config.get<ServerConfig[]>('servers', []);
+                            const serverIndex = servers.findIndex(s => s.name === message.name);
+                            servers[serverIndex].enabled = false;
+                            await config.update('servers', servers, vscode.ConfigurationTarget.Global);
                         }
 
 
@@ -558,9 +532,12 @@ export class ServerViewProvider implements vscode.WebviewViewProvider {
                 }
             }
         );
+        // Register the ChatHandler, it will push the ChatHandler to the context
+        // for disposal when the extension is deactivated
+        ChatHandler.register(context, clients);
 
         context.subscriptions.push(provider_registration);
-
+        context.subscriptions.push(provider);
         return provider;
     }
 

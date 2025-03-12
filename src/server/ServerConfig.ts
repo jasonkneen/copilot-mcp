@@ -1,7 +1,7 @@
 import { ChildProcess } from 'child_process';
 import * as vscode from 'vscode';
 import { Resource, Tool } from '@modelcontextprotocol/sdk/types';
-import { NamedClient as MCPClient } from '@/tools';
+import { NamedClient as MCPClient } from '@/toolInitHelpers';
 
 /**
  * Server types supported by the extension

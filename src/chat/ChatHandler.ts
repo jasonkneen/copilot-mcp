@@ -1,23 +1,26 @@
 import * as vscode from 'vscode';
 import { sendChatParticipantRequest } from '@vscode/chat-extension-utils';
-import { NamedClient } from '@/tools';
-
+import { NamedClient } from '@/toolInitHelpers';
+import { Tool } from '@modelcontextprotocol/sdk/types';
+import { getSystemPrompt } from '@/utilities';
 /**
  * Handles chat functionality for MCP integration by providing
  * chat handling and followup capabilities
  */
 export class ChatHandler implements vscode.ChatFollowupProvider {
+  private static _instance: ChatHandler | undefined;
+
   private _participant?: vscode.ChatParticipant;
   private _logoPath: vscode.Uri;
   private _clients: NamedClient[];
+  private _clientToolMap: Map<string, Tool[]>;
 
   /**
-   * Creates a new chat handler
-   * @param toolManager The tool manager instance
-   * @param resourceManager The resource manager instance
+   * Private constructor to enforce singleton pattern
+   * @param clients The named clients
    * @param extensionUri The extension URI
    */
-  constructor(
+  private constructor(
     clients: NamedClient[],
     private readonly extensionUri: vscode.ExtensionContext['extensionUri']
   ) {
@@ -26,6 +29,27 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
     // Set the logo path for the participant
     this._logoPath = vscode.Uri.joinPath(this.extensionUri, 'icon.png');
     this._clients = clients;
+    this._clientToolMap = new Map<string, Tool[]>();
+
+    // Initialize the client tool map
+    this._populateClientToolMap();
+  }
+
+  /**
+   * Populates the client tool map with tools from each client
+   * @private
+   */
+  private async _populateClientToolMap(): Promise<void> {
+    for (const client of this.clients) {
+      try {
+        const toolsResponse = await client.listTools();
+        if (toolsResponse && toolsResponse.tools) {
+          this._clientToolMap.set(client.name, toolsResponse.tools);
+        }
+      } catch (error) {
+        console.error(`Error fetching tools for client ${client.name}:`, error);
+      }
+    }
   }
 
   /**
@@ -49,36 +73,13 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
       if (request.command === 'listResources') {
         return this._handleListResourcesCommand(stream);
       }
-      // Get all available tools from the tool manager
-      // const allTools = await this.mcpClientManager.listTools();
-      const tools = vscode.lm.tools;
-      // get all the previous participant messages
-      const messages = [];
-      const previousMessages = context.history.filter(
-        h => h instanceof vscode.ChatResponseTurn
-      );
-      // add the previous messages to the messages array
-      previousMessages.forEach(m => {
-        let fullMessage = '';
-        m.response.forEach(r => {
-          const mdPart = r as vscode.ChatResponseMarkdownPart;
-          fullMessage += mdPart.value.value;
-        });
-        messages.push(vscode.LanguageModelChatMessage.Assistant(fullMessage));
-      });
 
       const workspaceRoots = vscode.workspace.workspaceFolders ?? [];
-      console.log("Available tools:", tools.length);
+      console.log("Available tools:", vscode.lm.tools.length);
       // Render TSX prompt
 
       // Forward the request to VS Code's chat system with our tools
-      const prompt = `
-      You are a helpful coding agent. This is the path of your current workspace(s):
-      ${workspaceRoots.map(root => `- ${root.uri.scheme}://${root.uri.fsPath}`).join('\n')}
-      If a tool requires a file path, you can provide the following path(s).
-      
-      `;
-      console.log(`Prompt: ${prompt}`);
+      const prompt = (await getSystemPrompt()).join('\n');
 
       const chatResult = sendChatParticipantRequest(request, context, {
         prompt: prompt,
@@ -87,27 +88,17 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
           references: true,
           responseText: true,
         },
-        tools: tools,
+        tools: vscode.lm.tools,
       }, token);
       stream.progress(
         "Thinking..."
       );
-      const result = await chatResult.result;
 
-      if (result.errorDetails) {
-        stream.push(new vscode.ChatResponseMarkdownPart(
-          new vscode.MarkdownString(`I encountered an error: ${result.errorDetails}`)
-        ));
-        return {
-          metadata: {
-            command: 'error',
-            error: result.errorDetails
-          }
-        };
-      }
+      const result = await chatResult.result;
+      console.log('Result:', result);
       return result;
     } catch (error) {
-      console.error('Error handling chat request:', error);
+      console.debug('Error handling chat request:', error);
 
       // Return a fallback response
       stream.push(new vscode.ChatResponseMarkdownPart(
@@ -116,18 +107,6 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
 
       return {};
     }
-  }
-
-  private async getUserIntent(prompt: string, request: vscode.ChatRequest, context: vscode.ChatContext) {
-    const tools = vscode.lm.tools;
-    const chatResult = sendChatParticipantRequest(request, context, {
-      prompt: `
-      You are a helpful assistant. You can use the following tools to assist the user:
-      ${tools.map(tool => `- ${tool.name}: ${tool.description}`).join('\n')}
-      `,
-    }, request.toolInvocationToken);
-    const result = await chatResult.result;
-    return result;
   }
 
   /**
@@ -155,6 +134,42 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
     return [];
   }
 
+  private getChatHistory(context: vscode.ChatContext): vscode.LanguageModelChatMessage[] {
+    // get all the previous participant messages
+    const messages: vscode.LanguageModelChatMessage[] = [];
+    const previousMessages = context.history.filter(
+      h => h instanceof vscode.ChatResponseTurn
+    );
+    // add the previous messages to the messages array
+    previousMessages.forEach(m => {
+      let fullMessage = '';
+      m.response.forEach(r => {
+        const mdPart = r as vscode.ChatResponseMarkdownPart;
+        fullMessage += mdPart.value.value;
+      });
+      messages.push(vscode.LanguageModelChatMessage.Assistant(fullMessage));
+    });
+    return messages;
+  }
+
+  public static async getPrompt(): Promise<string> {
+    const tools = vscode.lm.tools;
+    const toolNames = tools.map(_ => _.name).join(', ');
+    const FileReadTool = tools.find(tool => tool.name === 'FileReadTool');
+    const FindFilesTool = tools.find(tool => tool.name === 'FindFilesTool');
+    return `Launch a new agent that has access to the following tools: ${toolNames}. When you are searching for a keyword or file and are not confident that you will find the right match on the first try, use the Agent tool to perform the search for you. For example:
+  
+  - If you are searching for a keyword like "config" or "logger", the Agent tool is appropriate
+  - If you want to read a specific file path, use the ${FileReadTool?.name} or ${FindFilesTool?.name} tool instead of the Agent tool, to find the match more quickly
+  - If you are searching for a specific class definition like "class Foo", use the ${FindFilesTool?.name} tool instead, to find the match more quickly
+  
+  Usage notes:
+  1. Launch multiple agents concurrently whenever possible, to maximize performance; to do that, use a single message with multiple tool uses
+  2. When the agent is done, it will return a single message back to you. The result returned by the agent is not visible to the user. To show the user the result, you should send a text message back to the user with a concise summary of the result.
+  3. Each agent invocation is stateless. You will not be able to send additional messages to the agent, nor will the agent be able to communicate with you outside of its final report. Therefore, your prompt should contain a highly detailed task description for the agent to perform autonomously and you should specify exactly what information the agent should return back to you in its final and only message to you.
+  4. The agent's outputs should generally be trusted`;
+  }
+
   /**
    * Handle the listResources command
    * @param stream The response stream
@@ -164,9 +179,9 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
   ): Promise<vscode.ChatResult> {
     // Get resources from the resource manager
     const resources = [];
-    for (const client of this._clients) {
+    for (const client of this.clients) {
       try {
-        const resourcesResponse = await client.listResources();
+        const resourcesResponse = client.enabled ? await client.listResources() : { resources: [] };
         resources.push(...resourcesResponse.resources);
       } catch (e) {
         console.warn(`Failed to list resources for client ${client.getServerVersion()?.name}:`);
@@ -222,7 +237,8 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
     // Create the chat participant with a handler function
     const participant = vscode.chat.createChatParticipant(
       'copilot-mcp.mcp',
-      (request, context, stream, token) => this.handleRequest(request, context, stream, token)
+      this.handleRequest,
+      // (request, context, stream, token) => myChatHandler(request, context, stream, token)
     );
 
     // Set followup provider (this class implements the interface)
@@ -239,10 +255,19 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
 
   set clients(clients: NamedClient[]) {
     this._clients = clients;
+    // Repopulate the client tool map when clients change
+    this._populateClientToolMap();
   }
 
   get clients() {
-    return this._clients;
+    return this._clients.filter(client => client.enabled);
+  }
+
+  /**
+   * Get the map of client tools
+   */
+  get clientToolMap() {
+    return this._clientToolMap;
   }
 
   set participant(participant: vscode.ChatParticipant) {
@@ -257,18 +282,37 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
   }
 
   /**
+   * Gets the singleton instance of ChatHandler
+   * @param clients The named clients (only used when creating the instance)
+   * @param extensionUri The extension URI (only used when creating the instance)
+   * @returns The singleton ChatHandler instance
+   */
+  public static getInstance(
+    clients?: NamedClient[],
+    extensionUri?: vscode.ExtensionContext['extensionUri']
+  ): ChatHandler {
+    if (!ChatHandler._instance) {
+      if (!clients || !extensionUri) {
+        throw new Error('Clients and extensionUri are required when creating a new ChatHandler instance');
+      }
+      ChatHandler._instance = new ChatHandler(clients, extensionUri);
+    }
+    return ChatHandler._instance;
+  }
+
+  /**
    * Static factory method to create and register a chat handler
    * @param context The extension context
-   * @param toolManager The tool manager
-   * @param resourceManager The resource manager
+   * @param clients The named clients
    * @returns The chat participant disposable
    */
   public static register(
     context: vscode.ExtensionContext,
     clients: NamedClient[]
   ): vscode.Disposable {
-    const handler = new ChatHandler(clients, context.extensionUri);
-    return handler.register();
+    const handler = ChatHandler.getInstance(clients, context.extensionUri);
+    const participantDisposable = handler.register();
+    context.subscriptions.push(participantDisposable);
+    return participantDisposable;
   }
-
 }

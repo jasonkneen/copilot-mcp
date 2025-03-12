@@ -3,7 +3,7 @@
 </div>
 <div align="center">
 
-[![](https://dcbadge.limes.pink/api/server/https://discord.gg/nm28ej34PN)](https://discord.gg/nm28ej34PN)
+[![](https://dcbadge.limes.pink/api/server/https://discord.gg/copilotmcp)](https://discord.gg/copilotmcp)
 
 </div>
 <div style="display: flex; justify-content: center; gap: 20px; margin: 20px 0;">

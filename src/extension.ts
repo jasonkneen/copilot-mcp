@@ -1,92 +1,59 @@
-// The module 'vscode' contains the VS Code extensibility API
 import * as vscode from 'vscode';
-
 // Import our architectural components
-import { ChatHandler } from './chat/ChatHandler';
-import { Logger, LogLevel } from './utils/Logger';
-import { ServerViewProvider } from './ui/ServerViewProvider';
-import { ServerType } from './server/ServerConfig';
-import { ServerConfig } from './server/ServerConfig';
-import { installDynamicToolsExt, createToolsExtension, NamedClient } from './tools';
-import { registerToolUserChatParticipant } from 'tools-participant';
-import { registerChatTools } from 'tools-participant';
+import { ServerViewProvider } from '@/ui/ServerViewProvider';
+import { ServerConfig } from '@/server/ServerConfig';
+import { registerServerAndClients } from '@/toolInitHelpers';
+import { Credentials } from '@/lib/Github';
+
 // This method is called when your extension is activated
 export async function activate(context: vscode.ExtensionContext) {
+    const credentials = new Credentials();
+    await credentials.initialize(context);
+    let octo = await credentials.getOctokit();
+    // console.log('Octo:', octo.actions.);
     console.log('Workspace folders:', vscode.workspace.workspaceFolders);
     console.log('Starting activation of copilot-mcp extension...');
-    registerToolUserChatParticipant(context);
-    registerChatTools(context);
+
     try {
-        // Initialize the logger for the extension
-        const logger = Logger.initialize(context, 'MCP Server Manager', LogLevel.Debug);
-        logger.log('Initializing extension...');
+        console.log('Initializing extension...');
 
         // Get servers from configuration
         const config = vscode.workspace.getConfiguration('mcpManager');
         const servers = config.get<ServerConfig[]>('servers', []);
-        logger.log(`Servers: ${JSON.stringify(servers)}`);
-        const clients: NamedClient[] = [];
-        for (const server of servers) {
-            logger.log(`Installing dynamic tools ext for server`);
-            const client = await installDynamicToolsExt({
-                context,
-                serverName: server.name.trim(),
-                command: server.command,
-                env: { ...(server.env ?? {}) },
-                transport: server.type,
-                url: server.type === ServerType.SSE ? server.url : undefined
-            });
-            clients.push(client);
-
-            const serverInfo = client.getServerVersion();
-            if (serverInfo && serverInfo.name) {
-                logger.log(`Server ${server.name} added with client ID ${serverInfo.name}`);
-            } else {
-                logger.warn(`Could NOT get server name for added server ${server.name}`);
-            }
-
-        }
-        if (clients.length > 0) {
-            await createToolsExtension(clients, context);
-        }
+        console.log(`Servers: ${JSON.stringify(servers)}`);
+        const clients = await registerServerAndClients(servers, context);
         // Register the WebView Provider using our ServerViewProvider class
-        const serverViewProvider = await ServerViewProvider.createOrShow(context, clients);
-        logger.log('WebView provider registered');
+        await ServerViewProvider.createOrShow(context, clients);
 
-        // Register the openServerManager command
-        const openManagerCommand = vscode.commands.registerCommand('copilot-mcp.openServerManager', async () => {
-            try {
-                await vscode.commands.executeCommand('workbench.view.extension.mcpServers');
-            } catch (error) {
-                logger.warn(`Failed to open server manager: ${error}`);
-            }
-        });
-        context.subscriptions.push(openManagerCommand);
-
-        // Register the ChatHandler
-        const chatParticipant = ChatHandler.register(context, clients);
-
-        // context.subscriptions.push(chatParticipant);
-        logger.log('MCP client manager initialized');
-
-        // Add disposables to extension context
-        context.subscriptions.push(
-            // Core components
-            serverViewProvider,
-            // Chat participant
-            chatParticipant
-        );
-
-        logger.log('Extension activation complete');
         console.log('copilot-mcp extension activated successfully');
+
+        registerVscodeEvents(context);
     } catch (error) {
-        // ErrorHandler.handleError('Extension Activation', error);
-        const logger = Logger.getInstance();
-        logger.debug(`Error during extension activation: ${error}`);
+        console.debug(`Error during extension activation: ${error}`);
         vscode.window.showErrorMessage(`Failed to activate the extension: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
 
+const registerVscodeEvents = (context: vscode.ExtensionContext) => {
+    const configSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration('mcpManager',)) {
+            console.log('Servers configuration changed, triggering reload');
+            // reload the extension
+            vscode.commands.executeCommand('workbench.action.reloadWindow');
+        }
+    });
+    context.subscriptions.push(configSubscription);
+
+    // Register the openServerManager command
+    const openManagerCommand = vscode.commands.registerCommand('copilot-mcp.openServerManager', async () => {
+        try {
+            await vscode.commands.executeCommand('workbench.view.extension.mcpServers');
+        } catch (error) {
+            console.warn(`Failed to open server manager: ${error}`);
+        }
+    });
+    context.subscriptions.push(openManagerCommand);
+};
 // This method is called when your extension is deactivated
 export function deactivate() {
     try {

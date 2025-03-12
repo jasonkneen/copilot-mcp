@@ -12,7 +12,7 @@
   },
   "displayName": "Copilot MCP",
   "description": "VSCode extension that acts as a Model Context Protocol (MCP) client, enabling integration between MCP servers and GitHub Copilot Chat",
-  "version": "0.0.22",
+  "version": "0.0.23",
   "icon": "logo.png",
   "engines": {
     "vscode": "^1.97.0"
@@ -62,90 +62,8 @@
             "description": "Retrieve resources from your MCP servers"
           }
         ]
-      },
-      {
-				"id": "copilot-mcp.tools",
-				"fullName": "Tool User",
-				"name": "tools",
-				"description": "I use tools",
-				"isSticky": true,
-				"commands": [
-					{
-						"name": "list",
-						"description": "List all available tools"
-					},
-					{
-						"name": "all",
-						"description": "Use all registered tools. By default, only this extension's tools are used."
-					}
-				]
-			}
+      }
     ],
-    "languageModelTools": [{
-      "name": "copilot-mcp_tabCount",
-      "tags": [
-        "editors",
-        "copilot-mcp"
-      ],
-      "toolReferenceName": "tabCount",
-      "displayName": "Tab Count",
-      "modelDescription": "The number of active tabs in a tab group",
-      "icon": "$(files)",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "tabGroup": {
-            "type": "number",
-            "description": "The index of the tab group to check. This is optional- if not specified, the active tab group will be checked.",
-            "default": 0
-          }
-        }
-      }
-    },
-    {
-      "name": "copilot-mcp_findFiles",
-      "tags": [
-        "files",
-        "search",
-        "copilot-mcp"
-      ],
-      "displayName": "Find Files",
-      "modelDescription": "Search for files in the current workspace",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "pattern": {
-            "type": "string",
-            "description": "Search for files that match this glob pattern"
-          }
-        },
-        "required": [
-          "pattern"
-        ]
-      }
-    },
-    {
-      "name": "copilot-mcp_runInTerminal",
-      "tags": [
-        "terminal",
-        "copilot-mcp"
-      ],
-      "displayName": "Run in Terminal",
-      "modelDescription": "Run a command in a terminal and return the output",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "command": {
-            "type": "string",
-            "description": "The command to run"
-          }
-        },
-        "required": [
-          "command"
-        ]
-      }
-    }],
-    
     "viewsContainers": {
       "activitybar": [
         {
@@ -233,9 +151,9 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
-    "compile": "npm run build-tools && webpack",
+    "compile": "webpack",
     "watch": "webpack --watch",
-    "package": "npm run build-tools && webpack --mode production --devtool hidden-source-map",
+    "package": "webpack --mode production --devtool hidden-source-map",
     "build-tools": "cd .external/toolsParticipant && npm run build",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
@@ -270,7 +188,11 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^1.1.15",
+    "@anthropic-ai/sdk": "^0.39.0",
     "@modelcontextprotocol/sdk": "^1.6.1",
+    "@octokit/request": "^9.2.2",
+    "@octokit/rest": "^21.1.1",
     "@radix-ui/react-collapsible": "^1.1.3",
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-dropdown-menu": "^2.1.6",
@@ -284,6 +206,7 @@
     "@tailwindcss/postcss": "^4.0.6",
     "@vscode/chat-extension-utils": "^0.0.0-alpha.5",
     "@vscode/vsce": "^3.2.2",
+    "ai": "^4.1.54",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "find-cache-dir": "^5.0.0",
@@ -295,7 +218,6 @@
     "sonner": "^2.0.1",
     "spawn-rx": "^5.1.2",
     "tailwind-merge": "^3.0.1",
-    "tailwindcss-animate": "^1.0.7",
-    "tools-participant": "file:.external/toolsParticipant"
+    "tailwindcss-animate": "^1.0.7"
   }
 }
