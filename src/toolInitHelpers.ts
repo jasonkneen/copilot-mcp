@@ -169,10 +169,10 @@ export async function createToolsExtension(clients: NamedClient[], context: vsco
             ]
         }
     };
-    vscode.workspace.fs.writeFile(vscode.Uri.file(path.join(extDir, 'package.json')), Buffer.from(JSON.stringify(manifest, null, 2)));
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(path.join(extDir, 'package.json')), Buffer.from(JSON.stringify(manifest, null, 2)));
     // 3. Provide an empty extension entry point (required for VSIX packaging) and empty LICENSE file
-    vscode.workspace.fs.writeFile(vscode.Uri.file(path.join(extDir, 'extension.js')), Buffer.from(`exports.activate = function() {}; exports.deactivate = function() {};`));
-    vscode.workspace.fs.writeFile(vscode.Uri.file(path.join(extDir, 'LICENSE')), Buffer.from(''));
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(path.join(extDir, 'extension.js')), Buffer.from(`exports.activate = function() {}; exports.deactivate = function() {};`));
+    await vscode.workspace.fs.writeFile(vscode.Uri.file(path.join(extDir, 'LICENSE')), Buffer.from(''));
 
     // 4. Package the extension into a VSIX using the vsce API directly
     try {
