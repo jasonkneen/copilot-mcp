@@ -158,7 +158,11 @@ export async function createToolsExtension(clients: NamedClient[], context: vsco
             "toolReferenceName": tool.name,
             "displayName": tool.name,
             "modelDescription": tool.description,
-            "inputSchema": tool.inputSchema,
+            "inputSchema": tool.inputSchema ? {
+                type: tool.inputSchema.type,
+                properties: tool.inputSchema.properties,
+                required: tool.inputSchema.required
+            } : undefined,
             "canBeReferencedInPrompt": true,
             "icon": "$(note)",
             "userDescription": tool.description
@@ -231,35 +235,37 @@ export function registerChatTools(context: vscode.ExtensionContext, tools: Tool[
     // Initialize array for this server if it doesn't exist
     if (!serverToolsMap.has(client.name)) {
         serverToolsMap.set(client.name, []);
-        // Set the request handler for the ListRootsRequest
-        if (client.enabled) {
-            client.setRequestHandler(ListRootsRequestSchema, async () => {
-                const roots = vscode.workspace.workspaceFolders?.map(folder => (`${folder.uri.scheme}://${folder.uri.fsPath}`));
-                if (!roots || roots.length === 0) {
-                    return {
-                        roots: []
-                    };
-                }
-                return {
-                    roots: roots.map(root => ({
-                        uri: root,
-                        name: 'workspace_directory',
-                        type: 'directory'
-                    }))
-                };
-            });
-        }
     }
     if (client.enabled) {
-        for (const tool of tools) {
-            const vscodeTool: vscode.LanguageModelTool<typeof tool['inputSchema']> = new McpProxyTool(client, tool);
-            console.log(`Registering tool: ${tool.name}`);
-            const disposable = vscode.lm.registerTool(tool.name, vscodeTool);
-            context.subscriptions.push(disposable);
-            // Store the disposable in our map for later cleanup
-            serverToolsMap.get(client.name)?.push(disposable);
-            console.log(`Registered tool: ${tool.name}`);
-        }
+        // Set the request handler for the ListRootsRequest
+        client.setRequestHandler(ListRootsRequestSchema, async () => {
+            const roots = vscode.workspace.workspaceFolders?.map(folder => (`${folder.uri.scheme}://${folder.uri.fsPath}`));
+            if (!roots || roots.length === 0) {
+                return {
+                    roots: []
+                };
+            }
+            return {
+                roots: roots.map(root => ({
+                    uri: root,
+                    name: 'workspace_directory',
+                    type: 'directory'
+                }))
+            };
+        });
+        registerVscodeTools(tools, client, context);
+    }
+}
+
+function registerVscodeTools(tools: Tool[], client: NamedClient, context: vscode.ExtensionContext) {
+    for (const tool of tools) {
+        const vscodeTool: vscode.LanguageModelTool<typeof tool['inputSchema']> = new McpProxyTool(client, tool);
+        console.log(`Registering tool: ${tool.name}`);
+        const disposable = vscode.lm.registerTool(tool.name, vscodeTool);
+        context.subscriptions.push(disposable);
+        // Store the disposable in our map for later cleanup
+        serverToolsMap.get(client.name)?.push(disposable);
+        console.log(`Registered tool: ${tool.name}`);
     }
 }
 
