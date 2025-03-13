@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 // Import WebSocket polyfill (must be first)
 import './polyfills/websocket-polyfill';
-import '@vscode/prompt-tsx';
 // Import our architectural components
 import { ServerViewProvider } from './ServerViewProvider';
 import { ServerConfig } from './ServerConfig';
@@ -59,15 +58,22 @@ export async function activate(context: vscode.ExtensionContext) {
                 console.log('Workspace folders:', vscode.workspace.workspaceFolders);
                 console.log('Starting activation of copilot-mcp extension...');
 
-                progress.report({ message: 'Starting MCP server...' });
-                const { server, client, tools, dispose } = await startMcpServer();
+                try {
+                    progress.report({ message: 'Starting MCP server...' });
+                    const { server, client, tools, dispose } = await startMcpServer();
 
-                context.subscriptions.push(...tools, {
-                    dispose: () => {
-                        dispose();
-                        server.dispose();
-                    }
-                });
+                    context.subscriptions.push(...tools, {
+                        dispose: () => {
+                            dispose();
+                            server.dispose();
+                        }
+                    });
+
+                    const res = await client.ping();
+                    console.log('ping res', res);
+                } catch (error) {
+                    console.warn('Error starting MCP server:', error);
+                }
 
                 try {
                     console.log('Initializing extension...');
@@ -87,8 +93,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     progress.report({ message: 'MCP Extension activated successfully!' });
 
                     registerVscodeEvents(context);
-                    const res = await client.ping();
-                    console.log('ping res', res);
+
                     // Resolve the promise to complete the loading notification
                     resolve();
                 } catch (error) {
