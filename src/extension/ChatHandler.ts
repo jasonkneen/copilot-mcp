@@ -96,7 +96,7 @@ export class ChatHandler implements vscode.ChatFollowupProvider {
       );
 
       const result = await chatResult.result;
-      console.log('Result:', result);
+      
       return result;
     } catch (error) {
       console.debug('Error handling chat request:', error);

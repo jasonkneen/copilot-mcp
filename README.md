@@ -22,6 +22,20 @@
 
 > A powerful VSCode extension that acts as a Model Context Protocol (MCP) client, enabling seamless integration between MCP tool servers and GitHub Copilot Chat. Join the growing ecosystem of interoperable AI applications with flexible integration options.
 
+## 📑 Table of Contents
+
+- [Features](#-features)
+- [MCP Feature Support](#-mcp-feature-support)
+- [Installation](#-installation)
+- [Configuration](#️-configuration)
+- [Usage](#-usage)
+- [FAQ](#-faq)
+- [Requirements](#-requirements)
+- [Benefits](#-benefits)
+- [Contributing](#-contributing)
+- [Author](#️-author)
+- [License](#-license)
+
 ## ✨ Features
 
 - 🔧 **MCP Server Management**: Connect and manage multiple MCP servers through an intuitive UI
@@ -39,7 +53,7 @@
 | Feature | Support |
 |---------|----------|
 | Tools | ✅ Full support |
-| Resources | ✅* Text resource support |
+| Resources | ✅ Text resource support |
 | Prompts | ✅* Full support (coming soon) |
 | Sampling | ⏳ Planned |
 | Roots | ⏳ Planned |
@@ -97,6 +111,40 @@ To configure your MCP servers in VSCode settings:
 3. Enable/disable servers as needed
 4. Use GitHub Copilot Chat with your connected MCP tools using the `@mcp` participant
 5. View server status and tool availability in real-time
+
+## ❓ FAQ
+
+### Why aren't my servers appearing in the server list?
+
+This is typically caused by connection timeouts between the MCP SDK and your servers. Here's how to fix it:
+
+1. **Use absolute paths for your executables** - Instead of relative paths, specify the full path to your executable:
+   ```
+   /home/<user>/.nvm/versions/node/v<version>/bin/npx figma-developer-mcp --stdio --figma-api-key=...
+   ```
+
+2. **Find your executable paths** - Not sure where your executables are located? Run this in your terminal:
+   ```
+   which npx    # or node, uvx, etc.
+   ```
+
+Using absolute paths helps prevent connection issues and ensures the MCP SDK can reliably launch your servers.
+
+### Why doesn't tool calling work with Claude 3.7?
+
+The tool calling limitations are imposed by the VSCode API and Copilot Chat. Unfortunately, the tool calling models are limited to Claude 3.5 and GPT-4o. If you still face issues with tool calls, try switching to one or the other just for the tool you want to run. You can force a tool call in these models by using the '#' key and selecting the tool manually in your query.
+
+### How can I use the MCP server tools in Copilot Edits?
+
+You can use the tools in Copilot Edits mode by manually specifying the tool(s) with the '#' key, and selecting the tool from the list:
+
+<div align="center">
+  <img width="600" alt="Using tools in Copilot Edits with # key" src="media/tools.png" />
+</div>
+
+### Why isn't Copilot calling my tool?
+
+GitHub Copilot has its own internal system prompt that may be dissuading tool calls in the chat. If you find that Copilot isn't using your tools automatically, try using the manual tool selection method mentioned above.
 
 ## 🔗 Requirements
 
