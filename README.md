@@ -8,6 +8,7 @@ VSCode extension that acts as a Model Context Protocol (MCP) client, enabling in
 - View and manage MCP servers in a dedicated view
 - Use MCP tools in GitHub Copilot Chat
 - Expose MCP tools to other clients through an SSE endpoint
+- View server instances in a seperate panel
 
 ## Getting Started
 
